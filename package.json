@@ -1,0 +1,36 @@
+{
+  "name": "ghostmode",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "server": "npm start --prefix server",
+    "server:install": "npm install --prefix server",
+    "backend": "npm start --prefix backend",
+    "backend:install": "npm install --prefix backend",
+    "check:imports": "node scripts/check-imports.js"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "8.4.4",
+    "@react-navigation/bottom-tabs": "^7.16.2",
+    "@react-navigation/native": "^7.2.5",
+    "@react-navigation/native-stack": "^7.16.0",
+    "babel-preset-expo": "~54.0.10",
+    "expo": "~54.0.33",
+    "expo-crypto": "~15.0.9",
+    "expo-device": "~8.0.10",
+    "expo-notifications": "~0.32.17",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-web": "^0.21.0"
+  },
+  "private": true
+}
