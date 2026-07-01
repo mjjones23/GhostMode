@@ -7,7 +7,7 @@ import { getMockReply } from '../utils/mockCoach';
  * Override with EXPO_PUBLIC_COACH_API_URL in .env if your PC IP changes.
  */
 const BACKEND_URL = (
-  process.env.EXPO_PUBLIC_COACH_API_URL || 'http://10.0.0.197:3001'
+  process.env.EXPO_PUBLIC_COACH_API_URL || 'http://10.0.0.200:3001'
 ).replace(/\/$/, '');
 
 const REQUEST_TIMEOUT_MS = 12000;

@@ -23,6 +23,7 @@ import SafetyDisclaimerScreen from '../screens/SafetyDisclaimerScreen';
 import LoginScreen from '../screens/LoginScreen';
 import SignUpScreen from '../screens/SignUpScreen';
 import CrisisLockScreen from '../screens/CrisisLockScreen';
+import SOSModeScreen from '../screens/SOSModeScreen';
 import DailyCheckInScreen from '../screens/DailyCheckInScreen';
 
 import { getAppEntryRoute } from '../utils/storage';
@@ -171,6 +172,16 @@ export default function RootNavigator() {
         <Stack.Screen
           name="CrisisLock"
           component={CrisisLockScreen}
+          options={{
+            headerShown: false,
+            presentation: 'fullScreenModal',
+            animation: 'fade',
+            contentStyle: { backgroundColor: '#0a0a12' },
+          }}
+        />
+        <Stack.Screen
+          name="SOSMode"
+          component={SOSModeScreen}
           options={{
             headerShown: false,
             presentation: 'fullScreenModal',

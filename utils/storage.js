@@ -6,6 +6,12 @@ import {
   pickMessageIndexForDate,
   pickNewMessageIndex,
 } from './healingMessages';
+import {
+  getRecoveryQuoteByIndex,
+  getRecoveryQuoteCategoryByIndex,
+  pickQuoteIndexForDate,
+  pickNewQuoteIndex,
+} from '../content/recoveryQuotes';
 
 /** Keys used in the phone's local storage (AsyncStorage). */
 export const STORAGE_KEYS = {
@@ -16,6 +22,7 @@ export const STORAGE_KEYS = {
   SETUP_COMPLETE: '@ghostmode/setup_complete',
   MAIN_GOAL: '@ghostmode/main_goal',
   DAILY_HEALING: '@ghostmode/daily_healing',
+  DAILY_RECOVERY_QUOTE: '@ghostmode/daily_recovery_quote',
   REASONS: '@ghostmode/reasons',
   DEVELOPER_PREMIUM: '@ghostmode/developer_premium',
   USER_PROFILE: '@ghostmode/user_profile',
@@ -487,6 +494,61 @@ export async function refreshTodaysHealingMessage(currentIndex) {
   };
 }
 
+// ——— Daily recovery quote ———
+
+export async function loadDailyRecoveryQuoteState() {
+  return readJson(STORAGE_KEYS.DAILY_RECOVERY_QUOTE, null);
+}
+
+export async function saveDailyRecoveryQuoteState({ date, quoteIndex }) {
+  await writeJson(STORAGE_KEYS.DAILY_RECOVERY_QUOTE, {
+    date,
+    quoteIndex,
+  });
+}
+
+export async function getTodaysRecoveryQuote() {
+  const today = getTodayDateKey();
+  const saved = await loadDailyRecoveryQuoteState();
+
+  if (
+    saved?.date === today &&
+    typeof saved.quoteIndex === 'number' &&
+    Number.isFinite(saved.quoteIndex)
+  ) {
+    const quoteIndex = saved.quoteIndex;
+    return {
+      date: today,
+      quoteIndex,
+      quote: getRecoveryQuoteByIndex(quoteIndex),
+      category: getRecoveryQuoteCategoryByIndex(quoteIndex),
+    };
+  }
+
+  const quoteIndex = pickQuoteIndexForDate(today);
+  await saveDailyRecoveryQuoteState({ date: today, quoteIndex });
+
+  return {
+    date: today,
+    quoteIndex,
+    quote: getRecoveryQuoteByIndex(quoteIndex),
+    category: getRecoveryQuoteCategoryByIndex(quoteIndex),
+  };
+}
+
+export async function refreshTodaysRecoveryQuote(currentIndex) {
+  const today = getTodayDateKey();
+  const quoteIndex = pickNewQuoteIndex(currentIndex);
+  await saveDailyRecoveryQuoteState({ date: today, quoteIndex });
+
+  return {
+    date: today,
+    quoteIndex,
+    quote: getRecoveryQuoteByIndex(quoteIndex),
+    category: getRecoveryQuoteCategoryByIndex(quoteIndex),
+  };
+}
+
 // ——— Reasons not to text ———
 
 function normalizeReason(entry, index) {
@@ -769,6 +831,17 @@ function normalizeCoachMessage(message) {
     sender: message.sender,
     text: message.text,
     ...(message.crisis ? { crisis: true } : {}),
+    ...(Array.isArray(message.recoveryActions) && message.recoveryActions.length
+      ? {
+          recoveryActions: message.recoveryActions
+            .map((action) =>
+              typeof action === 'string'
+                ? action
+                : action?.id
+            )
+            .filter(Boolean),
+        }
+      : {}),
   };
 }
 

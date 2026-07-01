@@ -13,9 +13,16 @@ import {
   Alert,
 } from 'react-native';
 import GhostSafeArea from '../components/GhostSafeArea';
+import RecoveryActionsSection from '../components/RecoveryActionsSection';
 import { dismissKeyboard, TAB_BAR_KEYBOARD_OFFSET } from '../utils/keyboard';
 import { loadCoachChat, saveCoachChat, clearCoachChat } from '../utils/storage';
 import { MOCK_COACH_ERROR_FALLBACK } from '../utils/mockCoach';
+import {
+  getSuggestedRecoveryActions,
+  getRecoveryActionsByIds,
+} from '../content/recoveryActions';
+import { navigateToAppScreen } from '../navigation/navigationHelpers';
+import { useNavigation } from '@react-navigation/native';
 import {
   checkBackendStatus,
   fetchCoachReply,
@@ -94,7 +101,31 @@ function TypingIndicator() {
   );
 }
 
-function ChatMessage({ msg, animate, onAnimated }) {
+const STATIC_WELCOME_IDS = new Set(['welcome', 'starter']);
+
+function resolveRecoveryActions(msg, messages, index) {
+  if (msg.sender !== 'ai' || msg.crisis || STATIC_WELCOME_IDS.has(msg.id)) {
+    return [];
+  }
+
+  if (msg.recoveryActions?.length) {
+    return getRecoveryActionsByIds(msg.recoveryActions);
+  }
+
+  let userText = '';
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (messages[i].sender === 'user') {
+      userText = messages[i].text;
+      break;
+    }
+  }
+
+  if (!userText) return [];
+
+  return getSuggestedRecoveryActions(userText, msg.text);
+}
+
+function ChatMessage({ msg, animate, onAnimated, recoveryActions, onRecoveryAction }) {
   const opacity = useRef(new Animated.Value(animate ? 0 : 1)).current;
   const translateY = useRef(new Animated.Value(animate ? 10 : 0)).current;
 
@@ -149,6 +180,12 @@ function ChatMessage({ msg, animate, onAnimated }) {
           {msg.text}
         </Text>
       </View>
+      {recoveryActions?.length > 0 && (
+        <RecoveryActionsSection
+          actions={recoveryActions}
+          onAction={onRecoveryAction}
+        />
+      )}
     </Animated.View>
   );
 }
@@ -219,6 +256,7 @@ async function waitForRealisticReplyDelay(startedAt) {
 }
 
 export default function AICoachScreen() {
+  const navigation = useNavigation();
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -249,6 +287,22 @@ export default function AICoachScreen() {
   const markMessageAnimated = useCallback((messageId) => {
     skipAnimateIds.current.add(messageId);
   }, []);
+
+  const handleRecoveryAction = useCallback(
+    (action) => {
+      if (!action) return;
+
+      if (action.route) {
+        navigateToAppScreen(navigation, action.route);
+        return;
+      }
+
+      if (action.tip) {
+        Alert.alert(action.label, action.tip, [{ text: 'OK' }]);
+      }
+    },
+    [navigation]
+  );
 
   useEffect(() => {
     let active = true;
@@ -308,6 +362,11 @@ export default function AICoachScreen() {
         sender: 'ai',
         text: result.reply,
         crisis: result.crisis,
+        recoveryActions: result.crisis
+          ? []
+          : getSuggestedRecoveryActions(userText, result.reply).map(
+              (action) => action.id
+            ),
       };
       setMessages((prev) => [...prev, aiMessage]);
     } catch {
@@ -429,12 +488,14 @@ export default function AICoachScreen() {
             scrollEventThrottle={16}
             onContentSizeChange={() => scrollToBottom(true)}
           >
-            {messages.map((msg) => (
+            {messages.map((msg, index) => (
               <ChatMessage
                 key={msg.id}
                 msg={msg}
                 animate={!skipAnimateIds.current.has(msg.id)}
                 onAnimated={() => markMessageAnimated(msg.id)}
+                recoveryActions={resolveRecoveryActions(msg, messages, index)}
+                onRecoveryAction={handleRecoveryAction}
               />
             ))}
             {isTyping && (

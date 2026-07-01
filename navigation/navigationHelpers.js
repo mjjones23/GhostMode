@@ -12,6 +12,7 @@ export const ROOT_SCREENS = new Set([
   'StreakReset',
   'Emergency',
   'CrisisLock',
+  'SOSMode',
   'Paywall',
   'DailyReminder',
   'SafetyDisclaimer',

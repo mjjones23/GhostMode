@@ -18,10 +18,18 @@ import { usePremiumGate } from '../hooks/usePremiumGate';
 import {
   getTodaysHealingMessage,
   refreshTodaysHealingMessage,
+  getTodaysRecoveryQuote,
+  refreshTodaysRecoveryQuote,
   loadReasons,
   getTodaysCheckIn,
+  saveDailyCheckIn,
 } from '../utils/storage';
-import { getCheckInMoodMeta } from '../content/dailyCheckInContent';
+import {
+  getCheckInMoodMeta,
+  HOME_DAILY_CHECKIN_OPTIONS,
+  normalizeMoodId,
+} from '../content/dailyCheckInContent';
+import { QUOTE_CATEGORY_LABELS } from '../content/recoveryQuotes';
 import { navigateToAppScreen } from '../navigation/navigationHelpers';
 
 const QUICK_ACTIONS = [
@@ -143,9 +151,15 @@ export default function StreakTrackerScreen() {
   const [messageIndex, setMessageIndex] = useState(0);
   const [messageLoading, setMessageLoading] = useState(true);
   const [refreshingMessage, setRefreshingMessage] = useState(false);
+  const [recoveryQuote, setRecoveryQuote] = useState('');
+  const [quoteCategory, setQuoteCategory] = useState('healing');
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [quoteLoading, setQuoteLoading] = useState(true);
+  const [refreshingQuote, setRefreshingQuote] = useState(false);
   const [reasonCount, setReasonCount] = useState(0);
   const [todayCheckIn, setTodayCheckIn] = useState(null);
   const [checkInLoading, setCheckInLoading] = useState(true);
+  const [savingCheckIn, setSavingCheckIn] = useState(false);
 
   const loadHealingMessage = useCallback(async () => {
     const result = await getTodaysHealingMessage();
@@ -154,16 +168,25 @@ export default function StreakTrackerScreen() {
     setMessageLoading(false);
   }, []);
 
+  const loadRecoveryQuote = useCallback(async () => {
+    const result = await getTodaysRecoveryQuote();
+    setRecoveryQuote(result.quote);
+    setQuoteCategory(result.category || 'healing');
+    setQuoteIndex(result.quoteIndex);
+    setQuoteLoading(false);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       refreshStreak();
       loadHealingMessage();
+      loadRecoveryQuote();
       loadReasons().then((reasons) => setReasonCount(reasons.length));
       setCheckInLoading(true);
       getTodaysCheckIn()
         .then((checkIn) => setTodayCheckIn(checkIn))
         .finally(() => setCheckInLoading(false));
-    }, [refreshStreak, loadHealingMessage])
+    }, [refreshStreak, loadHealingMessage, loadRecoveryQuote])
   );
 
   const handleNewMessage = async () => {
@@ -179,6 +202,20 @@ export default function StreakTrackerScreen() {
     }
   };
 
+  const handleNewQuote = async () => {
+    if (refreshingQuote) return;
+
+    setRefreshingQuote(true);
+    try {
+      const result = await refreshTodaysRecoveryQuote(quoteIndex);
+      setRecoveryQuote(result.quote);
+      setQuoteCategory(result.category || 'healing');
+      setQuoteIndex(result.quoteIndex);
+    } finally {
+      setRefreshingQuote(false);
+    }
+  };
+
   const navigateToScreen = useCallback(
     (screen, params) => {
       navigateToAppScreen(navigation, screen, params);
@@ -189,6 +226,18 @@ export default function StreakTrackerScreen() {
   const openDailyCheckIn = useCallback(() => {
     navigateToScreen('DailyCheckIn');
   }, [navigateToScreen]);
+
+  const handleHomeCheckIn = useCallback(async (moodId) => {
+    if (savingCheckIn) return;
+
+    setSavingCheckIn(true);
+    try {
+      const saved = await saveDailyCheckIn(moodId);
+      setTodayCheckIn(saved);
+    } finally {
+      setSavingCheckIn(false);
+    }
+  }, [savingCheckIn]);
 
   const handleAction = (route, premium = false) => {
     if (premium) {
@@ -201,7 +250,12 @@ export default function StreakTrackerScreen() {
   const emergency = QUICK_ACTIONS.find((a) => a.id === 'emergency');
   const gridActions = QUICK_ACTIONS.filter((a) => !a.fullWidth && a.id !== 'settings');
   const settings = QUICK_ACTIONS.find((a) => a.id === 'settings');
-  const todayMoodMeta = todayCheckIn ? getCheckInMoodMeta(todayCheckIn.mood) : null;
+  const todayMoodMeta = todayCheckIn
+    ? getCheckInMoodMeta(normalizeMoodId(todayCheckIn.mood))
+    : null;
+  const selectedCheckInId = todayCheckIn?.mood
+    ? normalizeMoodId(todayCheckIn.mood)
+    : null;
 
   return (
     <GhostSafeArea style={styles.safe} tabBar>
@@ -226,6 +280,23 @@ export default function StreakTrackerScreen() {
             <ProgressRing day={streakDay} size={168} strokeWidth={10} />
           </View>
         </View>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.sosButton,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={() => navigateToScreen('SOSMode')}
+        >
+          <View style={styles.sosIconWrap}>
+            <Ionicons name="hand-left" size={20} color="#fca5a5" />
+          </View>
+          <View style={styles.sosTextWrap}>
+            <Text style={styles.sosTitle}>SOS — Urge to text them</Text>
+            <Text style={styles.sosSubtitle}>Pause before you send anything</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="rgba(252, 165, 165, 0.6)" />
+        </Pressable>
 
         <Pressable
           style={({ pressed }) => [
@@ -294,72 +365,103 @@ export default function StreakTrackerScreen() {
           </Pressable>
         </View>
 
-        <Pressable
-          style={({ pressed }) => [
-            styles.moodCard,
-            todayMoodMeta
-              ? {
-                  borderColor: todayMoodMeta.color,
-                }
-              : styles.moodCardEmpty,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={openDailyCheckIn}
-        >
-          <View style={styles.moodCardHeader}>
-            <View style={styles.moodTitleRow}>
-              <Ionicons name="heart" size={16} color="#e9d5ff" />
-              <Text style={styles.moodCardTitle}>Today&apos;s Mood</Text>
+        <View style={styles.quoteCard}>
+          <View style={styles.quoteHeader}>
+            <View style={styles.quoteTitleRow}>
+              <Ionicons name="chatbox-ellipses" size={16} color="#e9d5ff" />
+              <Text style={styles.quoteLabel}>Daily Quote</Text>
             </View>
-            {!checkInLoading && !todayMoodMeta && (
-              <View style={styles.moodCheckInPill}>
-                <Text style={styles.moodCheckInPillText}>Check in</Text>
+            {!quoteLoading && (
+              <View style={styles.quoteCategoryPill}>
+                <Text style={styles.quoteCategoryText}>
+                  {QUOTE_CATEGORY_LABELS[quoteCategory] || 'Healing'}
+                </Text>
               </View>
             )}
           </View>
 
-          <View style={styles.moodCardBody}>
-            <View
-              style={[
-                styles.moodIconWrap,
-                todayMoodMeta && {
-                  borderColor: todayMoodMeta.color,
-                  backgroundColor: 'rgba(255, 255, 255, 0.12)',
-                },
-              ]}
-            >
-              {checkInLoading ? (
-                <ActivityIndicator color="#e9d5ff" size="small" />
-              ) : (
-                <Text style={styles.moodEmoji}>
-                  {todayMoodMeta?.emoji ?? '🌙'}
-                </Text>
-              )}
+          {quoteLoading ? (
+            <ActivityIndicator color="#a78bfa" style={styles.messageLoader} />
+          ) : (
+            <Text style={styles.quoteText}>{`"${recoveryQuote}"`}</Text>
+          )}
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.newQuoteButton,
+              refreshingQuote && styles.newQuoteButtonDisabled,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={handleNewQuote}
+            disabled={quoteLoading || refreshingQuote}
+          >
+            <Ionicons
+              name="refresh"
+              size={16}
+              color="#e9d5ff"
+              style={styles.newMessageIcon}
+            />
+            <Text style={styles.newQuoteText}>
+              {refreshingQuote ? 'Loading...' : 'New Quote'}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.checkInCard}>
+          <View style={styles.checkInHeader}>
+            <View style={styles.checkInTitleRow}>
+              <Ionicons name="heart" size={16} color="#e9d5ff" />
+              <Text style={styles.checkInTitle}>Daily Check-In</Text>
             </View>
-            <View style={styles.moodCardContent}>
-              <Text
-                style={[
-                  styles.moodCardValue,
-                  todayMoodMeta
-                    ? { color: todayMoodMeta.color }
-                    : styles.moodCardValueEmpty,
-                ]}
-              >
-                {checkInLoading
-                  ? 'Loading...'
-                  : todayMoodMeta
-                    ? todayMoodMeta.label
-                    : 'How are you feeling?'}
-              </Text>
-              <Text style={styles.moodCardHint}>
-                {todayMoodMeta
-                  ? 'Tap to update your check-in'
-                  : 'Tap to log your mood for today'}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#e9d5ff" />
+            {todayMoodMeta && (
+              <Text style={styles.checkInSaved}>Saved for today</Text>
+            )}
           </View>
-        </Pressable>
+
+          <Text style={styles.checkInPrompt}>How are you feeling right now?</Text>
+
+          <View style={styles.checkInOptions}>
+            {HOME_DAILY_CHECKIN_OPTIONS.map((option) => {
+              const isSelected = selectedCheckInId === option.id;
+              return (
+                <Pressable
+                  key={option.id}
+                  style={({ pressed }) => [
+                    styles.checkInOption,
+                    {
+                      backgroundColor: option.bg,
+                      borderColor: isSelected ? option.color : option.border,
+                    },
+                    isSelected && styles.checkInOptionSelected,
+                    pressed && styles.buttonPressed,
+                  ]}
+                  onPress={() => handleHomeCheckIn(option.id)}
+                  disabled={savingCheckIn || checkInLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Check in: ${option.label}`}
+                >
+                  <Text style={styles.checkInEmoji}>{option.emoji}</Text>
+                  <Text
+                    style={[
+                      styles.checkInOptionLabel,
+                      isSelected && { color: option.color },
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable
+            style={({ pressed }) => [styles.checkInMoreLink, pressed && styles.buttonPressed]}
+            onPress={openDailyCheckIn}
+          >
+            <Text style={styles.checkInMoreText}>Open full check-in</Text>
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.35)" />
+          </Pressable>
+        </View>
 
         <Pressable
           style={({ pressed }) => [styles.reasonsCard, pressed && styles.buttonPressed]}
@@ -523,6 +625,47 @@ const styles = StyleSheet.create({
   ringWrap: {
     marginTop: 12,
   },
+  sosButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 340,
+    alignSelf: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    borderRadius: 16,
+    backgroundColor: 'rgba(220, 38, 38, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+      default: {},
+    }),
+  },
+  sosIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(220, 38, 38, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  sosTextWrap: {
+    flex: 1,
+  },
+  sosTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  sosSubtitle: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   almostTextedButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -651,6 +794,184 @@ const styles = StyleSheet.create({
     color: '#c4b5fd',
     fontSize: 14,
     fontWeight: '700',
+  },
+  quoteCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.18)',
+    marginBottom: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#7c3aed',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+      },
+      android: { elevation: 3 },
+      default: {},
+    }),
+  },
+  quoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  quoteCategoryPill: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.28)',
+  },
+  quoteCategoryText: {
+    color: '#c4b5fd',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  quoteTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  quoteLabel: {
+    color: '#e9d5ff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  quoteText: {
+    color: 'rgba(255, 255, 255, 0.88)',
+    fontSize: 17,
+    lineHeight: 26,
+    fontStyle: 'italic',
+    marginBottom: 16,
+  },
+  newQuoteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124, 58, 237, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+      default: {},
+    }),
+  },
+  newQuoteButtonDisabled: {
+    opacity: 0.55,
+  },
+  newQuoteText: {
+    color: '#e9d5ff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  checkInCard: {
+    backgroundColor: 'rgba(124, 58, 237, 0.14)',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(196, 181, 253, 0.35)',
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#7c3aed',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+      },
+      android: { elevation: 4 },
+      default: {},
+    }),
+  },
+  checkInHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  checkInTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkInTitle: {
+    color: '#e9d5ff',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  checkInSaved: {
+    color: 'rgba(134, 239, 172, 0.9)',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  checkInPrompt: {
+    color: 'rgba(255, 255, 255, 0.72)',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 14,
+  },
+  checkInOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  checkInOption: {
+    width: '31%',
+    minWidth: 96,
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+      default: {},
+    }),
+  },
+  checkInOptionSelected: {
+    borderWidth: 2,
+  },
+  checkInEmoji: {
+    fontSize: 26,
+    marginBottom: 6,
+  },
+  checkInOptionLabel: {
+    color: 'rgba(255, 255, 255, 0.82)',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  checkInMoreLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingTop: 4,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+      default: {},
+    }),
+  },
+  checkInMoreText: {
+    color: 'rgba(255, 255, 255, 0.38)',
+    fontSize: 12,
+    fontWeight: '600',
   },
   moodCard: {
     backgroundColor: 'rgba(124, 58, 237, 0.22)',

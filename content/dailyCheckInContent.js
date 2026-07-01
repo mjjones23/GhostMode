@@ -1,3 +1,47 @@
+/** Inline home check-in options (v1.0.1). */
+export const HOME_DAILY_CHECKIN_OPTIONS = [
+  {
+    id: 'struggling',
+    label: 'Struggling',
+    emoji: '😔',
+    color: '#f9a8d4',
+    bg: 'rgba(244, 114, 182, 0.14)',
+    border: 'rgba(244, 114, 182, 0.35)',
+  },
+  {
+    id: 'missing_them',
+    label: 'Missing them',
+    emoji: '😕',
+    color: '#93c5fd',
+    bg: 'rgba(147, 197, 253, 0.12)',
+    border: 'rgba(147, 197, 253, 0.32)',
+  },
+  {
+    id: 'okay',
+    label: 'Okay',
+    emoji: '😐',
+    color: '#c4b5fd',
+    bg: 'rgba(167, 139, 250, 0.14)',
+    border: 'rgba(167, 139, 250, 0.35)',
+  },
+  {
+    id: 'better',
+    label: 'Better',
+    emoji: '😊',
+    color: '#86efac',
+    bg: 'rgba(134, 239, 172, 0.1)',
+    border: 'rgba(134, 239, 172, 0.3)',
+  },
+  {
+    id: 'strong',
+    label: 'Strong',
+    emoji: '💪',
+    color: '#fde68a',
+    bg: 'rgba(253, 230, 138, 0.1)',
+    border: 'rgba(253, 230, 138, 0.28)',
+  },
+];
+
 export const CHECKIN_MOODS = [
   {
     id: 'hurting',
@@ -50,6 +94,16 @@ export const CHECKIN_MOODS = [
 ];
 
 export const CHECKIN_SUPPORT_MESSAGES = {
+  struggling:
+    'Struggling does not mean failing. You showed up today — that counts. Be gentle with yourself for the next hour.',
+  missing_them:
+    'Missing them is real. It does not mean you should reach out. Let the feeling pass without acting on it.',
+  okay:
+    'Okay is still progress. Not every day has to feel powerful — steady counts.',
+  better:
+    'Better days like this are built from hard choices you already made. Notice what helped today.',
+  strong:
+    'You are choosing yourself again. Strength in recovery is quiet — and you have it today.',
   hurting:
     'Pain is real, and you do not have to carry it alone tonight. Checking in is a brave step — be as gentle with yourself as you would a friend.',
   anxious:
@@ -64,8 +118,10 @@ export const CHECKIN_SUPPORT_MESSAGES = {
     'Look at you — choosing yourself again today. Confidence in no-contact is built one small decision at a time. Keep going.',
 };
 
+const ALL_CHECKIN_MOODS = [...HOME_DAILY_CHECKIN_OPTIONS, ...CHECKIN_MOODS];
+
 export function getCheckInMoodMeta(moodId) {
-  return CHECKIN_MOODS.find((m) => m.id === moodId) ?? null;
+  return ALL_CHECKIN_MOODS.find((m) => m.id === moodId) ?? null;
 }
 
 export function getCheckInSupportMessage(moodId) {
@@ -75,7 +131,8 @@ export function getCheckInSupportMessage(moodId) {
 const LEGACY_MOOD_MAP = {
   Sad: 'hurting',
   Angry: 'angry',
-  Lonely: 'missing them',
+  Lonely: 'missing_them',
+  'missing them': 'missing_them',
   Calm: 'healing',
   Hopeful: 'confident',
 };
@@ -88,7 +145,7 @@ export function normalizeMoodId(mood) {
     return LEGACY_MOOD_MAP[trimmed];
   }
 
-  const match = CHECKIN_MOODS.find(
+  const match = ALL_CHECKIN_MOODS.find(
     (option) =>
       option.id === trimmed ||
       option.label.toLowerCase() === trimmed.toLowerCase()

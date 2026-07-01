@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'Ghost Mode',
     slug: 'GhostMode',
-    version: '1.0.0',
+    version: '1.0.1',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'dark',
@@ -16,7 +16,7 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.ghostmode.app',
+      bundleIdentifier: 'com.mjjones.ghostmode',
       userInterfaceStyle: 'dark',
       infoPlist: {
         UIStatusBarStyle: 'UIStatusBarStyleLightContent',
@@ -52,5 +52,10 @@ export default {
       // 3. Uncomment and configure the plugin below after App Store Connect products exist
       // ['react-native-purchases', { ios: { usesStoreKit2IfAvailable: true } }],
     ],
+    extra: {
+      eas: {
+        projectId: '40468da6-38a7-4f72-b9d9-b7419c615631',
+      },
+    },
   },
 };
