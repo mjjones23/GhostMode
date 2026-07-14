@@ -74,6 +74,7 @@ export default function LoginScreen() {
             onChangeText={setPassword}
             placeholder="Your password"
             secureTextEntry
+            showVisibilityToggle
             textContentType="password"
             returnKeyType="done"
             onSubmitEditing={handleLogin}

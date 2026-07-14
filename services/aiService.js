@@ -1,22 +1,15 @@
 import { detectCrisis, CRISIS_REPLY } from '../utils/crisisSafety';
 import { getMockReply } from '../utils/mockCoach';
-
-/**
- * Backend on your PC (same Wi‑Fi as your iPhone).
- * localhost only works in the simulator — Expo Go on a real phone needs this IP.
- * Override with EXPO_PUBLIC_COACH_API_URL in .env if your PC IP changes.
- */
-const BACKEND_URL = (
-  process.env.EXPO_PUBLIC_COACH_API_URL || 'http://10.0.0.200:3001'
-).replace(/\/$/, '');
+import { getCoachApiUrl, isCoachApiConfigured } from '../config/api';
 
 const REQUEST_TIMEOUT_MS = 12000;
 const HEALTH_TIMEOUT_MS = 5000;
 const STATIC_WELCOME_IDS = new Set(['welcome', 'starter']);
 
-function getBackendUrl() {
-  return BACKEND_URL;
-}
+const OFFLINE_USER_MESSAGE =
+  "Couldn't reach Ghost Mode AI. Check your connection or try again later.";
+const NOT_CONFIGURED_MESSAGE =
+  'Coach backend URL is not configured for this build.';
 
 function buildApiMessages(chatHistory) {
   const mapped = chatHistory
@@ -45,6 +38,16 @@ function getLatestUserText(chatHistory) {
 }
 
 async function postChat(messages, userMessage) {
+  const baseUrl = getCoachApiUrl();
+  if (!baseUrl) {
+    return {
+      ok: false,
+      status: 0,
+      data: {},
+      error: NOT_CONFIGURED_MESSAGE,
+    };
+  }
+
   const requestBody = { messages, userMessage };
   console.log('[AI Coach] request body sent to backend:', JSON.stringify(requestBody));
 
@@ -52,7 +55,7 @@ async function postChat(messages, userMessage) {
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${getBackendUrl()}/chat`, {
+    const response = await fetch(`${baseUrl}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
@@ -67,6 +70,16 @@ async function postChat(messages, userMessage) {
     }
 
     return { ok: response.ok, status: response.status, data };
+  } catch (error) {
+    const aborted = error?.name === 'AbortError';
+    return {
+      ok: false,
+      status: 0,
+      data: {},
+      error: aborted
+        ? 'Ghost Mode AI took too long to respond.'
+        : OFFLINE_USER_MESSAGE,
+    };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -75,13 +88,24 @@ async function postChat(messages, userMessage) {
 /**
  * Checks whether the Ghost Mode backend is reachable.
  * Health returns mode: openai | mock depending on OPENAI_API_KEY on the server.
+ * Never returns or logs API keys.
  */
 export async function checkBackendStatus() {
+  if (!isCoachApiConfigured()) {
+    return {
+      connected: false,
+      mode: 'offline',
+      openaiConfigured: false,
+      error: NOT_CONFIGURED_MESSAGE,
+    };
+  }
+
+  const baseUrl = getCoachApiUrl();
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(`${getBackendUrl()}/health`, {
+    const response = await fetch(`${baseUrl}/health`, {
       signal: controller.signal,
     });
 
@@ -98,12 +122,17 @@ export async function checkBackendStatus() {
       connected,
       mode: connected ? data.mode || 'mock' : 'offline',
       openaiConfigured: Boolean(data.openaiConfigured),
+      error: connected ? null : OFFLINE_USER_MESSAGE,
     };
-  } catch {
+  } catch (error) {
+    const aborted = error?.name === 'AbortError';
     return {
       connected: false,
       mode: 'offline',
       openaiConfigured: false,
+      error: aborted
+        ? 'Ghost Mode AI health check timed out.'
+        : OFFLINE_USER_MESSAGE,
     };
   } finally {
     clearTimeout(timeoutId);
@@ -121,6 +150,7 @@ function fallbackReply(userText) {
 /**
  * Gets a coach reply: tries POST /chat on the backend first,
  * then falls back to in-app mock replies. Never throws.
+ * Never sends or exposes OpenAI API keys from the mobile app.
  */
 export async function fetchCoachReply({ userText, chatHistory = [] }) {
   const trimmedFromArg = String(userText || '').trim();
@@ -145,10 +175,20 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
     };
   }
 
+  if (!isCoachApiConfigured()) {
+    return {
+      reply: fallbackReply(trimmed),
+      crisis: false,
+      source: 'mock',
+      mode: 'mock',
+      error: NOT_CONFIGURED_MESSAGE,
+    };
+  }
+
   const messages = buildApiMessages(chatHistory);
 
   try {
-    const { ok, data } = await postChat(messages, trimmed);
+    const { ok, data, error } = await postChat(messages, trimmed);
 
     if (ok && typeof data.reply === 'string' && data.reply.trim()) {
       return {
@@ -158,6 +198,14 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
         mode: data.mode || 'mock',
       };
     }
+
+    return {
+      reply: fallbackReply(trimmed),
+      crisis: false,
+      source: 'mock',
+      mode: 'mock',
+      error: error || OFFLINE_USER_MESSAGE,
+    };
   } catch {
     // Backend offline or unreachable — use in-app mock below.
   }
@@ -167,5 +215,6 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
     crisis: false,
     source: 'mock',
     mode: 'mock',
+    error: OFFLINE_USER_MESSAGE,
   };
 }

@@ -1,19 +1,37 @@
+import Constants from 'expo-constants';
+
 /**
- * URL of your Ghost Mode backend (NOT OpenAI directly).
+ * Ghost Mode coach backend URL (never OpenAI directly).
  *
- * The OpenAI API key lives only in server/.env on your computer.
- * The mobile app sends chat messages to this backend URL instead.
+ * Dev: EXPO_PUBLIC_COACH_API_URL=http://YOUR_WIFI_IP:3001
+ * Prod/TestFlight: EXPO_PUBLIC_COACH_API_URL=https://your-public-backend.example.com
  *
- * Set in a root .env file (see .env.example):
- * EXPO_PUBLIC_COACH_API_URL=http://YOUR_COMPUTER_IP:3001
- *
- * - iOS Simulator: http://localhost:3001
- * - Android Emulator: http://10.0.2.2:3001
- * - Physical phone: http://192.168.x.x:3001 (your PC's Wi-Fi IP)
+ * OPENAI_API_KEY must NEVER live in the mobile app — only in backend/.env.
  */
-const DEFAULT_URL = 'http://localhost:3001';
+const DEV_FALLBACK_URL = 'http://10.0.0.200:3001';
+
+function readConfiguredUrl() {
+  const fromEnv = process.env.EXPO_PUBLIC_COACH_API_URL;
+  const fromExtra = Constants.expoConfig?.extra?.coachApiUrl;
+  return String(fromEnv || fromExtra || '').trim();
+}
 
 export function getCoachApiUrl() {
-  const url = process.env.EXPO_PUBLIC_COACH_API_URL || DEFAULT_URL;
-  return url.replace(/\/$/, '');
+  const configured = readConfiguredUrl();
+
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+
+  // Local Expo / __DEV__ only — LAN backend on your PC
+  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+    return DEV_FALLBACK_URL;
+  }
+
+  // Production/TestFlight without a public URL: empty → health fails clearly
+  return '';
+}
+
+export function isCoachApiConfigured() {
+  return Boolean(getCoachApiUrl());
 }

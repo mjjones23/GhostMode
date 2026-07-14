@@ -1,0 +1,9 @@
+# Keep secrets out of the Docker image.
+.env
+.env.*
+!.env.example
+node_modules
+npm-debug.log
+.git
+.gitignore
+README*

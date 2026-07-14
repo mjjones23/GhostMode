@@ -9,12 +9,18 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_COACH_API_URL": "https://ghostmode-backend-production.up.railway.app"
+      }
     },
     "production": {
       "autoIncrement": true,
       "ios": {
         "autoIncrement": "buildNumber"
+      },
+      "env": {
+        "EXPO_PUBLIC_COACH_API_URL": "https://ghostmode-backend-production.up.railway.app"
       }
     }
   },

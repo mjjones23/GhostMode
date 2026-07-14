@@ -1,10 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   Pressable,
-  
   ScrollView,
   Platform,
   ActivityIndicator,
@@ -13,6 +12,7 @@ import GhostSafeArea from '../components/GhostSafeArea';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import ProgressRing from '../components/ProgressRing';
+import MilestoneConfetti from '../components/MilestoneConfetti';
 import { useStreak } from '../context/StreakContext';
 import { usePremiumGate } from '../hooks/usePremiumGate';
 import {
@@ -23,6 +23,8 @@ import {
   loadReasons,
   getTodaysCheckIn,
   saveDailyCheckIn,
+  getLastCelebratedMilestone,
+  setLastCelebratedMilestone,
 } from '../utils/storage';
 import {
   getCheckInMoodMeta,
@@ -31,6 +33,13 @@ import {
 } from '../content/dailyCheckInContent';
 import { QUOTE_CATEGORY_LABELS } from '../content/recoveryQuotes';
 import { navigateToAppScreen } from '../navigation/navigationHelpers';
+import {
+  getAllBadgesWithStatus,
+  getCelebrationMessage,
+  getMilestoneProgress,
+  getMilestoneReachedToday,
+  getRecoveryLevel,
+} from '../utils/streakMilestones';
 
 const QUICK_ACTIONS = [
   {
@@ -160,6 +169,15 @@ export default function StreakTrackerScreen() {
   const [todayCheckIn, setTodayCheckIn] = useState(null);
   const [checkInLoading, setCheckInLoading] = useState(true);
   const [savingCheckIn, setSavingCheckIn] = useState(false);
+  const [celebrationMilestone, setCelebrationMilestone] = useState(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  const recoveryLevel = useMemo(() => getRecoveryLevel(streakDay), [streakDay]);
+  const milestoneProgress = useMemo(
+    () => getMilestoneProgress(streakDay),
+    [streakDay]
+  );
+  const badges = useMemo(() => getAllBadgesWithStatus(streakDay), [streakDay]);
 
   const loadHealingMessage = useCallback(async () => {
     const result = await getTodaysHealingMessage();
@@ -176,6 +194,24 @@ export default function StreakTrackerScreen() {
     setQuoteLoading(false);
   }, []);
 
+  const checkMilestoneCelebration = useCallback(async (day) => {
+    const reached = getMilestoneReachedToday(day);
+    if (!reached) {
+      setCelebrationMilestone(null);
+      setShowConfetti(false);
+      return;
+    }
+
+    const lastCelebrated = await getLastCelebratedMilestone();
+    if (lastCelebrated != null && lastCelebrated >= reached) {
+      return;
+    }
+
+    await setLastCelebratedMilestone(reached);
+    setCelebrationMilestone(reached);
+    setShowConfetti(true);
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       refreshStreak();
@@ -187,6 +223,12 @@ export default function StreakTrackerScreen() {
         .then((checkIn) => setTodayCheckIn(checkIn))
         .finally(() => setCheckInLoading(false));
     }, [refreshStreak, loadHealingMessage, loadRecoveryQuote])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      checkMilestoneCelebration(streakDay);
+    }, [streakDay, checkMilestoneCelebration])
   );
 
   const handleNewMessage = async () => {
@@ -269,15 +311,97 @@ export default function StreakTrackerScreen() {
         </View>
 
         <View style={styles.streakCard}>
+          <MilestoneConfetti active={showConfetti} />
           <View style={styles.streakTop}>
             <View>
               <Text style={styles.streakLabel}>No-contact streak</Text>
               <Text style={styles.dayCount}>Day {streakDay}</Text>
-              <Text style={styles.healingSubtitle}>You are healing.</Text>
+              <View style={styles.levelRow}>
+                <Text style={styles.levelEmoji}>{recoveryLevel.emoji}</Text>
+                <Text style={[styles.levelText, { color: recoveryLevel.color }]}>
+                  {recoveryLevel.label}
+                </Text>
+              </View>
+              <Text style={styles.healingSubtitle}>
+                {milestoneProgress.isMaxed
+                  ? 'Every milestone unlocked. Keep going.'
+                  : milestoneProgress.isComplete
+                    ? `Milestone reached — Day ${milestoneProgress.next}`
+                    : `Next milestone: Day ${milestoneProgress.next}`}
+              </Text>
             </View>
           </View>
           <View style={styles.ringWrap}>
             <ProgressRing day={streakDay} size={168} strokeWidth={10} />
+          </View>
+        </View>
+
+        {celebrationMilestone != null && (
+          <View style={styles.celebrationCard}>
+            <Text style={styles.celebrationBadge}>Milestone unlocked</Text>
+            <Text style={styles.celebrationTitle}>
+              Day {celebrationMilestone}
+            </Text>
+            <Text style={styles.celebrationMessage}>
+              {getCelebrationMessage(celebrationMilestone)}
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.celebrationDismiss,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => {
+                setShowConfetti(false);
+                setCelebrationMilestone(null);
+              }}
+            >
+              <Text style={styles.celebrationDismissText}>Keep going</Text>
+            </Pressable>
+          </View>
+        )}
+
+        <View style={styles.badgesCard}>
+          <View style={styles.badgesHeader}>
+            <Ionicons name="ribbon-outline" size={16} color="#e9d5ff" />
+            <Text style={styles.badgesTitle}>Achievement Badges</Text>
+          </View>
+          <View style={styles.badgesGrid}>
+            {badges.map((badge) => (
+              <View
+                key={badge.id}
+                style={[
+                  styles.badgeItem,
+                  !badge.unlocked && styles.badgeItemLocked,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeEmoji,
+                    !badge.unlocked && styles.badgeEmojiLocked,
+                  ]}
+                >
+                  {badge.emoji}
+                </Text>
+                <Text
+                  style={[
+                    styles.badgeLabel,
+                    !badge.unlocked && styles.badgeLabelLocked,
+                  ]}
+                >
+                  {badge.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.badgeStatus,
+                    badge.unlocked
+                      ? styles.badgeStatusUnlocked
+                      : styles.badgeStatusLocked,
+                  ]}
+                >
+                  {badge.unlocked ? 'Unlocked' : 'Locked'}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -583,6 +707,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(167, 139, 250, 0.25)',
     marginBottom: 16,
     alignItems: 'center',
+    overflow: 'hidden',
+    position: 'relative',
     ...Platform.select({
       ios: {
         shadowColor: '#7c3aed',
@@ -615,15 +741,155 @@ const styles = StyleSheet.create({
     letterSpacing: -1.5,
     textAlign: 'center',
   },
+  levelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  levelEmoji: {
+    fontSize: 16,
+  },
+  levelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
   healingSubtitle: {
     color: 'rgba(255, 255, 255, 0.65)',
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: '500',
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 6,
   },
   ringWrap: {
     marginTop: 12,
+  },
+  celebrationCard: {
+    backgroundColor: 'rgba(124, 58, 237, 0.28)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: 'rgba(196, 181, 253, 0.55)',
+    marginBottom: 16,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#7c3aed',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
+      },
+      android: { elevation: 6 },
+      default: {},
+    }),
+  },
+  celebrationBadge: {
+    color: '#c4b5fd',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  celebrationTitle: {
+    color: '#ffffff',
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  celebrationMessage: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  celebrationDismiss: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124, 58, 237, 0.4)',
+    borderWidth: 1,
+    borderColor: 'rgba(196, 181, 253, 0.4)',
+  },
+  celebrationDismissText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  badgesCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.2)',
+    marginBottom: 16,
+  },
+  badgesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  badgesTitle: {
+    color: '#e9d5ff',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  badgesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  badgeItem: {
+    width: '22%',
+    minWidth: 70,
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(124, 58, 237, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.35)',
+  },
+  badgeItemLocked: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  badgeEmoji: {
+    fontSize: 22,
+    marginBottom: 6,
+  },
+  badgeEmojiLocked: {
+    opacity: 0.35,
+  },
+  badgeLabel: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  badgeLabelLocked: {
+    color: 'rgba(255, 255, 255, 0.35)',
+  },
+  badgeStatus: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  badgeStatusUnlocked: {
+    color: '#86efac',
+  },
+  badgeStatusLocked: {
+    color: 'rgba(255, 255, 255, 0.28)',
   },
   sosButton: {
     flexDirection: 'row',

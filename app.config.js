@@ -53,6 +53,7 @@ export default {
       // ['react-native-purchases', { ios: { usesStoreKit2IfAvailable: true } }],
     ],
     extra: {
+      coachApiUrl: process.env.EXPO_PUBLIC_COACH_API_URL || '',
       eas: {
         projectId: '40468da6-38a7-4f72-b9d9-b7419c615631',
       },

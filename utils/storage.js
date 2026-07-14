@@ -12,6 +12,13 @@ import {
   pickQuoteIndexForDate,
   pickNewQuoteIndex,
 } from '../content/recoveryQuotes';
+import {
+  APP_REVIEW_DISPLAY_NAME,
+  APP_REVIEW_PASSWORD,
+  APP_REVIEW_PREMIUM_EMAIL,
+  isAppReviewCredentials,
+  isAppReviewPremiumEmail,
+} from '../config/appReview';
 
 /** Keys used in the phone's local storage (AsyncStorage). */
 export const STORAGE_KEYS = {
@@ -30,6 +37,7 @@ export const STORAGE_KEYS = {
   DAILY_CHECKINS: '@ghostmode/daily_checkins',
   DAILY_CHECKINS_MIGRATED: '@ghostmode/daily_checkins_migrated',
   COACH_CHAT: '@ghostmode/coach_chat',
+  LAST_CELEBRATED_MILESTONE: '@ghostmode/last_celebrated_milestone',
 };
 
 export const GOAL_OPTIONS = [
@@ -407,6 +415,7 @@ export async function saveNoContactStart(isoDate) {
 export async function resetNoContactStreak() {
   const today = getTodayDateKey();
   await saveNoContactStart(today);
+  await AsyncStorage.removeItem(STORAGE_KEYS.LAST_CELEBRATED_MILESTONE);
   return today;
 }
 
@@ -425,6 +434,20 @@ export async function ensureNoContactStartOnHeal() {
     return today;
   }
   return existing;
+}
+
+export async function getLastCelebratedMilestone() {
+  const raw = await AsyncStorage.getItem(STORAGE_KEYS.LAST_CELEBRATED_MILESTONE);
+  if (raw == null || raw === '') return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+export async function setLastCelebratedMilestone(days) {
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.LAST_CELEBRATED_MILESTONE,
+    String(days)
+  );
 }
 
 // ——— Reminder settings ———
@@ -736,6 +759,18 @@ export async function registerLocalUser({ name, email, password }) {
     return { ok: false, message: 'Password must be at least 6 characters.' };
   }
 
+  // Apple App Review account — always recreate/login with the dedicated credentials.
+  if (isAppReviewCredentials(normalizedEmail, trimmedPassword)) {
+    return ensureAppReviewLocalAccount();
+  }
+
+  if (isAppReviewPremiumEmail(normalizedEmail)) {
+    return {
+      ok: false,
+      message: 'Incorrect password for the App Review account.',
+    };
+  }
+
   const existing = await loadUserProfile();
   if (existing?.email) {
     return {
@@ -763,12 +798,50 @@ export async function registerLocalUser({ name, email, password }) {
   };
 }
 
+/**
+ * Upserts the Apple App Review local profile and signs it in.
+ * Works on a fresh TestFlight install (no prior signup required).
+ */
+async function ensureAppReviewLocalAccount() {
+  const passwordHash = await hashLocalPassword(
+    APP_REVIEW_PASSWORD,
+    APP_REVIEW_PREMIUM_EMAIL
+  );
+
+  const existing = await loadUserProfile();
+  const profile = {
+    name: APP_REVIEW_DISPLAY_NAME,
+    email: APP_REVIEW_PREMIUM_EMAIL,
+    passwordHash,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    // Marks this profile as the App Review demo account.
+    isAppReviewAccount: true,
+  };
+
+  await saveUserProfile(profile);
+  await setAuthSession(true);
+
+  return {
+    ok: true,
+    user: { name: profile.name, email: profile.email },
+  };
+}
+
 export async function loginLocalUser({ email, password }) {
   const normalizedEmail = normalizeEmail(email);
   const trimmedPassword = String(password || '');
 
   if (!normalizedEmail || !trimmedPassword) {
     return { ok: false, message: 'Please enter your email and password.' };
+  }
+
+  // Apple App Review — create/sign in without requiring a prior local signup.
+  if (isAppReviewCredentials(normalizedEmail, trimmedPassword)) {
+    return ensureAppReviewLocalAccount();
+  }
+
+  if (isAppReviewPremiumEmail(normalizedEmail)) {
+    return { ok: false, message: 'Incorrect email or password.' };
   }
 
   const profile = await loadUserProfile();

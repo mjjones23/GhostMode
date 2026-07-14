@@ -86,6 +86,7 @@ export default function SignUpScreen() {
             onChangeText={setPassword}
             placeholder="At least 6 characters"
             secureTextEntry
+            showVisibilityToggle
             textContentType="newPassword"
             returnKeyType="done"
             onSubmitEditing={handleSignUp}

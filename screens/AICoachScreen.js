@@ -190,7 +190,7 @@ function ChatMessage({ msg, animate, onAnimated, recoveryActions, onRecoveryActi
   );
 }
 
-function BackendStatusSection({ status, backendMode, lastReplyMode }) {
+function BackendStatusSection({ status, backendMode, lastReplyMode, errorHint }) {
   const isConnected = status === 'connected';
   const isChecking = status === 'checking';
 
@@ -224,7 +224,8 @@ function BackendStatusSection({ status, backendMode, lastReplyMode }) {
       </View>
       {!isConnected && !isChecking && (
         <Text style={styles.statusHint}>
-          Start the backend (see README_BACKEND.md) or keep using built-in mock replies.
+          {errorHint ||
+            'Start the backend (see README_BACKEND.md) or keep using built-in mock replies.'}
         </Text>
       )}
     </View>
@@ -262,6 +263,7 @@ export default function AICoachScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [backendStatus, setBackendStatus] = useState('checking');
   const [backendMode, setBackendMode] = useState('offline');
+  const [backendError, setBackendError] = useState(null);
   const [lastReplyMode, setLastReplyMode] = useState(null);
   const [chatHydrated, setChatHydrated] = useState(false);
   const scrollRef = useRef(null);
@@ -337,6 +339,7 @@ export default function AICoachScreen() {
       if (active) {
         setBackendStatus(result.connected ? 'connected' : 'mock');
         setBackendMode(result.mode || 'offline');
+        setBackendError(result.error || null);
       }
     });
 
@@ -473,6 +476,7 @@ export default function AICoachScreen() {
           status={backendStatus}
           backendMode={backendMode}
           lastReplyMode={lastReplyMode}
+          errorHint={backendError}
         />
 
         <View style={styles.messagesWrap}>
