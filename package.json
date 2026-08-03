@@ -11,7 +11,10 @@
     "server:install": "npm install --prefix server",
     "backend": "npm start --prefix backend",
     "backend:install": "npm install --prefix backend",
-    "check:imports": "node scripts/check-imports.js"
+    "check:imports": "node scripts/check-imports.js",
+    "build:ios": "eas build --platform ios --profile production --auto-submit",
+    "build:ios:only": "eas build --platform ios --profile production",
+    "submit:ios": "eas submit --platform ios --profile production --latest"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
