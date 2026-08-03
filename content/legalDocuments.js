@@ -76,7 +76,7 @@ export const LEGAL_DOCUMENTS = {
       {
         title: 'Subscriptions',
         body:
-          'Premium features may require a paid subscription through the Apple App Store. Billing, renewals, refunds, and cancellation follow Apple’s terms and the Ghost Mode subscription terms shown at purchase.',
+          'All Ghost Mode AI features are currently free. If paid subscriptions return later, billing, renewals, refunds, and cancellation will follow Apple’s terms and the Ghost Mode subscription terms shown at purchase.',
       },
       {
         title: 'Limitations',

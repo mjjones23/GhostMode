@@ -24,6 +24,7 @@ import {
 import { useStreak } from '../context/StreakContext';
 import { usePremium } from '../context/PremiumContext';
 import { usePremiumGate } from '../hooks/usePremiumGate';
+import { PREMIUM_ENABLED } from '../config/premiumFlags';
 import {
   REMINDER_BODY,
   requestReminderPermissionsWithAlert,
@@ -118,7 +119,7 @@ export default function SettingsScreen() {
   };
 
   const openNotificationTimePicker = () => {
-    if (!isPremium) {
+    if (PREMIUM_ENABLED && !isPremium) {
       openPaywall();
       return;
     }
@@ -143,7 +144,7 @@ export default function SettingsScreen() {
   };
 
   const toggleReminder = async (value) => {
-    if (!isPremium) {
+    if (PREMIUM_ENABLED && !isPremium) {
       openPaywall();
       return;
     }
@@ -305,7 +306,7 @@ export default function SettingsScreen() {
           <View style={styles.row}>
             <View style={styles.rowLabelWrap}>
               <Text style={styles.rowLabel}>Daily reminder</Text>
-              {!isPremium && (
+              {PREMIUM_ENABLED && !isPremium && (
                 <Text style={styles.premiumTag}>Premium</Text>
               )}
             </View>
@@ -324,63 +325,84 @@ export default function SettingsScreen() {
           <SettingsRow
             label="Notification time"
             value={notificationTime}
-            onPress={isPremium ? openNotificationTimePicker : openPaywall}
+            onPress={
+              !PREMIUM_ENABLED || isPremium
+                ? openNotificationTimePicker
+                : openPaywall
+            }
             showChevron
           />
           <View style={styles.divider} />
           <SettingsRow
             label="Reminder screen"
             value="Customize"
-            onPress={isPremium ? () => navigateToScreen('DailyReminder') : openPaywall}
+            onPress={
+              !PREMIUM_ENABLED || isPremium
+                ? () => navigateToScreen('DailyReminder')
+                : openPaywall
+            }
           />
-          {!isPremium && (
+          {PREMIUM_ENABLED && !isPremium && (
             <Text style={styles.rowHint}>
               Daily healing reminders are a Premium feature.
             </Text>
           )}
-          {isPremium && !reminderEnabled && (
+          {(!PREMIUM_ENABLED || isPremium) && !reminderEnabled && (
             <Text style={styles.rowHint}>Turn on daily reminder to schedule notifications</Text>
           )}
-          {isPremium && reminderEnabled && (
+          {(!PREMIUM_ENABLED || isPremium) && reminderEnabled && (
             <Text style={styles.rowHint}>
               Notification: "{REMINDER_BODY}"
             </Text>
           )}
         </View>
 
-        <Text style={styles.sectionTitle}>Subscription</Text>
-        <View style={styles.card}>
-          <SettingsRow
-            label="Premium status"
-            value={isPremium ? 'Premium' : 'Free plan'}
-            onPress={() =>
-              isPremium
-                ? showDemoAlert('Premium', 'You have Ghost Mode Premium.')
-                : navigateToScreen('Paywall')
-            }
-          />
-          {__DEV__ ? (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Premium access</Text>
-                <Switch
-                  value={developerPremium}
-                  onValueChange={toggleDeveloperPremium}
-                  trackColor={{
-                    false: 'rgba(255,255,255,0.15)',
-                    true: 'rgba(124, 58, 237, 0.5)',
-                  }}
-                  thumbColor={developerPremium ? '#a78bfa' : '#f4f4f5'}
-                  ios_backgroundColor="rgba(255,255,255,0.15)"
-                />
-              </View>
-              <Text style={styles.rowHint}>
-                Enable Premium features on this device while subscriptions are being set up.
+        {PREMIUM_ENABLED ? (
+          <>
+            <Text style={styles.sectionTitle}>Subscription</Text>
+            <View style={styles.card}>
+              <SettingsRow
+                label="Premium status"
+                value={isPremium ? 'Premium' : 'Free plan'}
+                onPress={() =>
+                  isPremium
+                    ? showDemoAlert('Premium', 'You have Ghost Mode Premium.')
+                    : navigateToScreen('Paywall')
+                }
+              />
+              {__DEV__ ? (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Premium access</Text>
+                    <Switch
+                      value={developerPremium}
+                      onValueChange={toggleDeveloperPremium}
+                      trackColor={{
+                        false: 'rgba(255,255,255,0.15)',
+                        true: 'rgba(124, 58, 237, 0.5)',
+                      }}
+                      thumbColor={developerPremium ? '#a78bfa' : '#f4f4f5'}
+                      ios_backgroundColor="rgba(255,255,255,0.15)"
+                    />
+                  </View>
+                  <Text style={styles.rowHint}>
+                    Enable Premium features on this device while subscriptions are being set up.
+                  </Text>
+                </>
+              ) : null}
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Features</Text>
+            <View style={styles.card}>
+              <Text style={styles.freePeriodText}>
+                All Ghost Mode AI features are currently free.
               </Text>
-            </>
-          ) : null}
-        </View>
+            </View>
+          </>
+        )}
 
         <Text style={styles.sectionTitle}>Privacy & Safety</Text>
         <View style={styles.card}>
@@ -537,6 +559,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 12,
     marginTop: -8,
+  },
+  freePeriodText: {
+    color: 'rgba(255, 255, 255, 0.78)',
+    fontSize: 15,
+    fontWeight: '600',
+    lineHeight: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
   },
   sectionHint: {
     width: '100%',

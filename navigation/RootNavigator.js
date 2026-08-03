@@ -28,6 +28,7 @@ import DailyCheckInScreen from '../screens/DailyCheckInScreen';
 
 import { getAppEntryRoute } from '../utils/storage';
 import { usePremium } from '../context/PremiumContext';
+import { PREMIUM_ENABLED } from '../config/premiumFlags';
 import TabBarIcon from './TabBarIcon';
 import LaunchLoadingScreen from '../components/LaunchLoadingScreen';
 import {
@@ -110,7 +111,8 @@ function MainTabs() {
         options={{ tabBarLabel: 'AI Coach' }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
-            if (!isPremium) {
+            // Free period: AI Coach is open to every user.
+            if (PREMIUM_ENABLED && !isPremium) {
               e.preventDefault();
               navigation.getParent()?.navigate('Paywall');
             }

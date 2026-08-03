@@ -31,7 +31,7 @@ import { dismissKeyboard } from '../utils/keyboard';
 
 export default function DailyReminderScreen() {
   const navigation = useNavigation();
-  const { isPremium, openPaywall } = usePremiumGate();
+  const { isPremium, openPaywall, premiumEnabled } = usePremiumGate();
   const [reminderEnabled, setReminderEnabled] = useState(true);
   const [selectedTime, setSelectedTime] = useState(DEFAULT_REMINDER.time);
   const [message, setMessage] = useState(REMINDER_BODY);
@@ -50,11 +50,11 @@ export default function DailyReminderScreen() {
   }, [loadSettings]);
 
   useEffect(() => {
-    if (!isPremium) {
+    if (premiumEnabled && !isPremium) {
       openPaywall();
       navigation.goBack();
     }
-  }, [isPremium, navigation, openPaywall]);
+  }, [isPremium, navigation, openPaywall, premiumEnabled]);
 
   const toggleReminder = async (value) => {
     if (value) {
@@ -89,7 +89,7 @@ export default function DailyReminderScreen() {
     );
   };
 
-  if (!isPremium) {
+  if (premiumEnabled && !isPremium) {
     return null;
   }
 

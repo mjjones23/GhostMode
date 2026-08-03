@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import ProgressRing from '../components/ProgressRing';
 import MilestoneConfetti from '../components/MilestoneConfetti';
 import { useStreak } from '../context/StreakContext';
-import { usePremiumGate } from '../hooks/usePremiumGate';
 import {
   getTodaysHealingMessage,
   refreshTodaysHealingMessage,
@@ -60,7 +59,6 @@ const QUICK_ACTIONS = [
     bg: 'rgba(99, 102, 241, 0.18)',
     border: 'rgba(129, 140, 248, 0.35)',
     route: 'Coach',
-    premium: true,
   },
   {
     id: 'journal',
@@ -81,15 +79,6 @@ const QUICK_ACTIONS = [
     route: 'Mood',
   },
   {
-    id: 'premium',
-    label: 'Go Premium',
-    icon: 'diamond',
-    color: '#ffffff',
-    bg: 'rgba(124, 58, 237, 0.3)',
-    border: 'rgba(196, 181, 253, 0.45)',
-    route: 'Paywall',
-  },
-  {
     id: 'settings',
     label: 'Settings',
     icon: 'settings',
@@ -100,7 +89,7 @@ const QUICK_ACTIONS = [
   },
 ];
 
-function QuickAction({ action, onPress, variant = 'row', showPremiumLock = false }) {
+function QuickAction({ action, onPress, variant = 'row' }) {
   const isGrid = variant === 'grid';
 
   return (
@@ -137,9 +126,6 @@ function QuickAction({ action, onPress, variant = 'row', showPremiumLock = false
       >
         {action.label}
       </Text>
-      {showPremiumLock && (
-        <Ionicons name="lock-closed" size={12} color="rgba(255,255,255,0.45)" />
-      )}
       {!isGrid && (
         <Ionicons
           name="chevron-forward"
@@ -155,7 +141,6 @@ function QuickAction({ action, onPress, variant = 'row', showPremiumLock = false
 export default function StreakTrackerScreen() {
   const navigation = useNavigation();
   const { streakDay, refreshStreak } = useStreak();
-  const { isPremium, requirePremium } = usePremiumGate();
   const [healingMessage, setHealingMessage] = useState('');
   const [messageIndex, setMessageIndex] = useState(0);
   const [messageLoading, setMessageLoading] = useState(true);
@@ -281,11 +266,7 @@ export default function StreakTrackerScreen() {
     }
   }, [savingCheckIn]);
 
-  const handleAction = (route, premium = false) => {
-    if (premium) {
-      requirePremium(() => navigateToScreen(route));
-      return;
-    }
+  const handleAction = (route) => {
     navigateToScreen(route);
   };
 
@@ -307,7 +288,9 @@ export default function StreakTrackerScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Ghost Mode</Text>
-          <Text style={styles.headerSubtitle}>Your healing dashboard</Text>
+          <Text style={styles.headerSubtitle}>
+            All Ghost Mode AI features are currently free.
+          </Text>
         </View>
 
         <View style={styles.streakCard}>
@@ -616,9 +599,7 @@ export default function StreakTrackerScreen() {
             styles.insightsCard,
             pressed && styles.buttonPressed,
           ]}
-          onPress={() =>
-            requirePremium(() => navigateToScreen('ProgressInsights'))
-          }
+          onPress={() => navigateToScreen('ProgressInsights')}
         >
           <View style={styles.insightsCardTop}>
             <View style={styles.insightsIconWrap}>
@@ -627,9 +608,6 @@ export default function StreakTrackerScreen() {
             <View style={styles.insightsCardContent}>
               <View style={styles.insightsTitleRow}>
                 <Text style={styles.insightsCardTitle}>Progress Insights</Text>
-                {!isPremium && (
-                  <Ionicons name="lock-closed" size={14} color="#c4b5fd" />
-                )}
               </View>
               <Text style={styles.insightsCardSubtitle}>
                 Streak, journal, moods, and a message for you
@@ -658,8 +636,7 @@ export default function StreakTrackerScreen() {
               key={action.id}
               action={action}
               variant="grid"
-              showPremiumLock={action.premium && !isPremium}
-              onPress={() => handleAction(action.route, action.premium)}
+              onPress={() => handleAction(action.route)}
             />
           ))}
         </View>

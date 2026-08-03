@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import { loadReminderSettings, saveReminderSettings } from './storage';
+import { PREMIUM_ENABLED } from '../config/premiumFlags';
 
 export const REMINDER_NOTIFICATION_ID = 'ghostmode-daily-reminder';
 export const REMINDER_TITLE = 'Ghost Mode';
@@ -201,7 +202,8 @@ export async function syncDailyReminderNotifications({
 }) {
   await cancelDailyReminderNotification();
 
-  if (!enabled || !isPremium) {
+  const premiumOk = !PREMIUM_ENABLED || isPremium;
+  if (!enabled || !premiumOk) {
     return { scheduled: false };
   }
 

@@ -1,7 +1,11 @@
 import { Pressable, StyleSheet, Text, View, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { PREMIUM_ENABLED } from '../config/premiumFlags';
 
 export default function PremiumUpsellBanner({ title, onPress }) {
+  // Free period: never show upgrade banners.
+  if (!PREMIUM_ENABLED) return null;
+
   return (
     <Pressable
       style={({ pressed }) => [styles.banner, pressed && styles.pressed]}
@@ -38,20 +42,18 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.88,
-    transform: [{ scale: 0.98 }],
   },
   iconWrap: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: 'rgba(124, 58, 237, 0.25)',
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   textWrap: {
     flex: 1,
-    marginRight: 8,
   },
   title: {
     color: '#ffffff',
@@ -62,6 +64,6 @@ const styles = StyleSheet.create({
   subtitle: {
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
-    lineHeight: 16,
+    fontWeight: '500',
   },
 });

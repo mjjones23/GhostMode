@@ -5,6 +5,7 @@ import {
   configurePurchases,
 } from '../services/purchasesService';
 import { isAppReviewPremiumEmail } from '../config/appReview';
+import { PREMIUM_ENABLED } from '../config/premiumFlags';
 import { useAuth } from './AuthContext';
 
 const PremiumContext = createContext({
@@ -13,6 +14,7 @@ const PremiumContext = createContext({
   subscriptionPremium: false,
   reviewPremium: false,
   premiumLoaded: false,
+  premiumEnabled: PREMIUM_ENABLED,
   refreshPremium: async () => {},
   setDeveloperPremium: async () => {},
 });
@@ -52,14 +54,19 @@ export function PremiumProvider({ children }) {
     setDeveloperPremiumState(Boolean(enabled));
   }, []);
 
+  const subscribedOrBypass =
+    developerPremium || subscriptionPremium || reviewPremium;
+
   return (
     <PremiumContext.Provider
       value={{
-        isPremium: developerPremium || subscriptionPremium || reviewPremium,
+        // Free period: every user has full access while PREMIUM_ENABLED is false.
+        isPremium: !PREMIUM_ENABLED || subscribedOrBypass,
         developerPremium,
         subscriptionPremium,
         reviewPremium,
         premiumLoaded,
+        premiumEnabled: PREMIUM_ENABLED,
         refreshPremium,
         setDeveloperPremium,
       }}

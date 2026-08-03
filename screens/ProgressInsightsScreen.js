@@ -51,20 +51,20 @@ function MoodBreakdownRow({ mood, count, isTop }) {
 
 export default function ProgressInsightsScreen() {
   const navigation = useNavigation();
-  const { isPremium, openPaywall } = usePremiumGate();
+  const { isPremium, openPaywall, premiumEnabled } = usePremiumGate();
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState(null);
 
   useEffect(() => {
-    if (!isPremium) {
+    if (premiumEnabled && !isPremium) {
       openPaywall();
       navigation.goBack();
     }
-  }, [isPremium, navigation, openPaywall]);
+  }, [isPremium, navigation, openPaywall, premiumEnabled]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!isPremium) return undefined;
+      if (premiumEnabled && !isPremium) return undefined;
 
       let active = true;
 
@@ -80,7 +80,7 @@ export default function ProgressInsightsScreen() {
       return () => {
         active = false;
       };
-    }, [isPremium, navigation, openPaywall])
+    }, [isPremium, premiumEnabled])
   );
 
   const moodCountLabel = insights?.mostCommonMood
@@ -93,7 +93,7 @@ export default function ProgressInsightsScreen() {
     ? formatJournalEntryDateTime(insights.latestJournalDate)
     : '—';
 
-  if (!isPremium) {
+  if (premiumEnabled && !isPremium) {
     return null;
   }
 

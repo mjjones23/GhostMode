@@ -1,13 +1,15 @@
-/** Free users can view this many journal/mood history items. */
+import { PREMIUM_ENABLED } from '../config/premiumFlags';
+
+/** Free users can view this many journal/mood history items (when Premium is enabled). */
 export const FREE_HISTORY_LIMIT = 3;
 
 export function limitHistoryForFree(items, isPremium, limit = FREE_HISTORY_LIMIT) {
-  if (isPremium || !Array.isArray(items)) return items;
+  if (!PREMIUM_ENABLED || isPremium || !Array.isArray(items)) return items;
   return items.slice(0, limit);
 }
 
 export function getHiddenHistoryCount(items, isPremium, limit = FREE_HISTORY_LIMIT) {
-  if (isPremium || !Array.isArray(items)) return 0;
+  if (!PREMIUM_ENABLED || isPremium || !Array.isArray(items)) return 0;
   return Math.max(0, items.length - limit);
 }
 

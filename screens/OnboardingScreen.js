@@ -13,6 +13,9 @@ export default function OnboardingScreen({ onStartHealing }) {
         <Text style={styles.subtitle}>Stay strong. Don't text them.</Text>
 
         <Text style={styles.hint}>Go no-contact. Heal on your terms.</Text>
+        <Text style={styles.coachHint}>
+          AI Coach is available to every Ghost Mode user.
+        </Text>
 
         <Pressable
           style={({ pressed }) => [
@@ -78,9 +81,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '400',
     textAlign: 'center',
+    marginBottom: 12,
+  },
+  coachHint: {
+    color: '#c4b5fd',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 48,
-    maxWidth: 280,
+    marginBottom: 36,
+    maxWidth: 300,
   },
   buttonOuter: {
     width: '100%',

@@ -16,6 +16,7 @@ import {
   DEFAULT_PAYWALL_PLAN_ID,
   PAYWALL_PLANS,
 } from '../config/revenuecat';
+import { PREMIUM_ENABLED } from '../config/premiumFlags';
 import { usePremium } from '../context/PremiumContext';
 import {
   getOfferings,
@@ -113,6 +114,28 @@ export default function PaywallScreen() {
       >
         <ScreenBackButton />
 
+        {!PREMIUM_ENABLED ? (
+          <>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Free access</Text>
+            </View>
+            <Text style={styles.title}>Everything is free right now</Text>
+            <Text style={styles.subtitle}>
+              All Ghost Mode AI features are currently free.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.button,
+                styles.buttonPrimary,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.buttonPrimaryText}>Continue</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
         <View style={styles.badge}>
           <Text style={styles.badgeText}>Ghost Mode Premium</Text>
         </View>
@@ -214,6 +237,8 @@ export default function PaywallScreen() {
           Subscriptions renew automatically unless canceled in your Apple ID settings.
           Payment will be charged to your Apple ID account.
         </Text>
+          </>
+        )}
       </ScrollView>
     </GhostSafeArea>
   );

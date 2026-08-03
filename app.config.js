@@ -2,7 +2,7 @@ export default {
   expo: {
     name: 'Ghost Mode',
     slug: 'GhostMode',
-    version: '1.0.1',
+    version: '1.1.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'dark',

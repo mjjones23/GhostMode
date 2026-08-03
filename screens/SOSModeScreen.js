@@ -11,7 +11,6 @@ import {
 import GhostSafeArea from '../components/GhostSafeArea';
 import { useFocusEffect, useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { usePremiumGate } from '../hooks/usePremiumGate';
 
 export const SOS_COUNTDOWN_SECONDS = 60;
 
@@ -23,7 +22,6 @@ function formatCountdown(totalSeconds) {
 
 export default function SOSModeScreen() {
   const navigation = useNavigation();
-  const { requirePremium } = usePremiumGate();
   const [secondsLeft, setSecondsLeft] = useState(SOS_COUNTDOWN_SECONDS);
   const [countdownDone, setCountdownDone] = useState(false);
 
@@ -59,15 +57,13 @@ export default function SOSModeScreen() {
   };
 
   const openCoach = () => {
-    requirePremium(() => {
-      navigation.dispatch(
-        CommonActions.navigate({
-          name: 'MainTabs',
-          params: { screen: 'Coach' },
-          merge: true,
-        })
-      );
-    });
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'MainTabs',
+        params: { screen: 'Coach' },
+        merge: true,
+      })
+    );
   };
 
   const openJournal = () => {
