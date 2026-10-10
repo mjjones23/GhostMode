@@ -49,6 +49,37 @@ function MoodBreakdownRow({ mood, count, isTop }) {
   );
 }
 
+function RecoveryPlanWeekCard({ week }) {
+  return (
+    <View style={styles.planCard}>
+      <Text style={styles.detailLabel}>Recovery plans this week</Text>
+      <Text style={styles.planHeadline}>
+        {week.plansCompleted} of 7 days completed
+      </Text>
+      <Text style={styles.planSubline}>
+        {week.activitiesCompleted}{' '}
+        {week.activitiesCompleted === 1 ? 'activity' : 'activities'} done in the last 7 days
+      </Text>
+      <View style={styles.planDays}>
+        {week.days.map((day) => (
+          <View key={day.date} style={styles.planDay}>
+            <View
+              style={[
+                styles.planDot,
+                day.completedCount > 0 && styles.planDotPartial,
+                day.isComplete && styles.planDotComplete,
+              ]}
+            >
+              {day.isComplete && <Ionicons name="checkmark" size={12} color="#ffffff" />}
+            </View>
+            <Text style={styles.planDayLabel}>{day.dayLabel}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export default function ProgressInsightsScreen() {
   const navigation = useNavigation();
   const { isPremium, openPaywall, premiumEnabled } = usePremiumGate();
@@ -149,6 +180,8 @@ export default function ProgressInsightsScreen() {
                 accent="#fca5a5"
               />
             </View>
+
+            {insights.planWeek && <RecoveryPlanWeekCard week={insights.planWeek} />}
 
             <View style={styles.moodCard}>
               <Text style={styles.detailLabel}>Most common mood</Text>
@@ -332,6 +365,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     lineHeight: 16,
+  },
+  planCard: {
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.24)',
+    marginBottom: 16,
+  },
+  planHeadline: {
+    color: '#ffffff',
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  planSubline: {
+    color: 'rgba(255, 255, 255, 0.55)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  planDays: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  planDay: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  planDot: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planDotPartial: {
+    borderColor: '#a78bfa',
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+  },
+  planDotComplete: {
+    borderColor: '#a78bfa',
+    backgroundColor: '#7c3aed',
+  },
+  planDayLabel: {
+    color: 'rgba(255, 255, 255, 0.45)',
+    fontSize: 11,
+    fontWeight: '700',
   },
   moodCard: {
     backgroundColor: 'rgba(34, 197, 94, 0.08)',

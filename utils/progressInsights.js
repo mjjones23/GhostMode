@@ -9,6 +9,7 @@ import {
   loadMoodLogs,
   getStreakDay,
 } from './storage';
+import { getRecoveryPlanWeekSummary } from './dailyRecoveryPlan';
 
 function normalizeMoodName(mood) {
   return normalizeMoodId(mood);
@@ -104,10 +105,11 @@ export function buildProgressInsight({
 }
 
 export async function getProgressInsights() {
-  const [startDate, journalEntries, moodLogs] = await Promise.all([
+  const [startDate, journalEntries, moodLogs, planWeek] = await Promise.all([
     getOrInitNoContactStart(),
     loadJournalEntries(),
     loadMoodLogs(),
+    getRecoveryPlanWeekSummary(),
   ]);
 
   const streakDay = getStreakDay(startDate);
@@ -123,6 +125,7 @@ export async function getProgressInsights() {
     mostCommonMood,
     moodBreakdown: mostCommonMood?.breakdown || [],
     latestJournalDate,
+    planWeek,
     insight: buildProgressInsight({
       streakDay,
       journalCount,

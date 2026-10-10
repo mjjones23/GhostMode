@@ -38,6 +38,7 @@ export const STORAGE_KEYS = {
   DAILY_CHECKINS_MIGRATED: '@ghostmode/daily_checkins_migrated',
   COACH_CHAT: '@ghostmode/coach_chat',
   LAST_CELEBRATED_MILESTONE: '@ghostmode/last_celebrated_milestone',
+  DAILY_PLANS: '@ghostmode/daily_plans',
 };
 
 export const GOAL_OPTIONS = [
@@ -570,6 +571,18 @@ export async function refreshTodaysRecoveryQuote(currentIndex) {
     quote: getRecoveryQuoteByIndex(quoteIndex),
     category: getRecoveryQuoteCategoryByIndex(quoteIndex),
   };
+}
+
+// ——— Daily recovery plans (one saved plan per calendar day, keyed by date) ———
+
+export async function loadDailyPlans() {
+  const plans = await readJson(STORAGE_KEYS.DAILY_PLANS, {});
+  if (!plans || typeof plans !== 'object' || Array.isArray(plans)) return {};
+  return plans;
+}
+
+export async function saveDailyPlans(plans) {
+  await writeJson(STORAGE_KEYS.DAILY_PLANS, plans);
 }
 
 // ——— Reasons not to text ———

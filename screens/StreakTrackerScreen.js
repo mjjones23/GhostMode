@@ -13,6 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import ProgressRing from '../components/ProgressRing';
 import MilestoneConfetti from '../components/MilestoneConfetti';
+import DailyRecoveryPlanCard from '../components/DailyRecoveryPlanCard';
 import { useStreak } from '../context/StreakContext';
 import {
   getTodaysHealingMessage,
@@ -342,6 +343,11 @@ export default function StreakTrackerScreen() {
             </Pressable>
           </View>
         )}
+
+        <DailyRecoveryPlanCard
+          refreshKey={todayCheckIn?.mood ?? null}
+          onOpenActivity={navigateToScreen}
+        />
 
         <View style={styles.badgesCard}>
           <View style={styles.badgesHeader}>
