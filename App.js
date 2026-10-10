@@ -15,7 +15,7 @@ export default function App() {
           <ReminderBootstrap />
           <StreakProvider>
             <DarkBackground>
-              <StatusBar style="light" backgroundColor="#0a0a12" />
+              <StatusBar style="light" />
               <RootNavigator />
             </DarkBackground>
           </StreakProvider>

@@ -6,7 +6,6 @@ export default {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'dark',
-    newArchEnabled: true,
     primaryColor: '#7c3aed',
     backgroundColor: '#0a0a12',
     splash: {
@@ -29,7 +28,6 @@ export default {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#0a0a12',
       },
-      edgeToEdgeEnabled: true,
       userInterfaceStyle: 'dark',
       permissions: ['android.permission.POST_NOTIFICATIONS'],
     },
@@ -38,6 +36,8 @@ export default {
       backgroundColor: '#0a0a12',
     },
     plugins: [
+      'expo-font',
+      ['expo-status-bar', { style: 'light' }],
       [
         'expo-notifications',
         {
