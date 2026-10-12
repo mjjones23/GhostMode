@@ -19,6 +19,7 @@ import {
   isAppReviewCredentials,
   isAppReviewPremiumEmail,
 } from '../config/appReview';
+import { getStreakDayFromDateKeys, toDateKey } from './dateMath';
 
 /** Keys used in the phone's local storage (AsyncStorage). */
 export const STORAGE_KEYS = {
@@ -39,6 +40,7 @@ export const STORAGE_KEYS = {
   COACH_CHAT: '@ghostmode/coach_chat',
   LAST_CELEBRATED_MILESTONE: '@ghostmode/last_celebrated_milestone',
   DAILY_PLANS: '@ghostmode/daily_plans',
+  ACHIEVEMENTS: '@ghostmode/achievements',
 };
 
 export const GOAL_OPTIONS = [
@@ -100,26 +102,11 @@ export function formatJournalEntryDateTime(isoDate) {
 }
 
 export function getStreakDay(isoDate) {
-  const start = new Date(`${isoDate}T12:00:00`);
-  const today = new Date();
-  start.setHours(0, 0, 0, 0);
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.round((today - start) / (1000 * 60 * 60 * 24));
-  return Math.max(1, diff + 1);
+  return getStreakDayFromDateKeys(String(isoDate || '').slice(0, 10), toDateKey());
 }
 
 export function getTodayDateKey() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function defaultStartDate(daysAgo = 12) {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return d.toISOString().split('T')[0];
+  return toDateKey();
 }
 
 // ——— Journal ———
@@ -430,7 +417,7 @@ export async function getOrInitNoContactStart() {
 export async function ensureNoContactStartOnHeal() {
   const existing = await loadNoContactStart();
   if (!existing) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayDateKey();
     await saveNoContactStart(today);
     return today;
   }
@@ -449,6 +436,16 @@ export async function setLastCelebratedMilestone(days) {
     STORAGE_KEYS.LAST_CELEBRATED_MILESTONE,
     String(days)
   );
+}
+
+// ——— Achievements & Levels ———
+
+export async function loadAchievementsState() {
+  return readJson(STORAGE_KEYS.ACHIEVEMENTS, null);
+}
+
+export async function saveAchievementsState(state) {
+  await writeJson(STORAGE_KEYS.ACHIEVEMENTS, state);
 }
 
 // ——— Reminder settings ———

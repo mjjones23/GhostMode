@@ -9,6 +9,7 @@ export const ROOT_SCREENS = new Set([
   'MainTabs',
   'Reasons',
   'ProgressInsights',
+  'Achievements',
   'StreakReset',
   'Emergency',
   'CrisisLock',

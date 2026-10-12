@@ -24,6 +24,7 @@ import {
   getRandomSupportMessage,
 } from '../content/crisisLockContent';
 import { getRandomReason } from '../utils/storage';
+import { recordUrgeResisted } from '../utils/achievements';
 
 function CoachBubble({ text }) {
   return (
@@ -47,6 +48,13 @@ export default function CrisisLockScreen() {
   const [personalReason, setPersonalReason] = useState(null);
   const [reasonLoading, setReasonLoading] = useState(true);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const urgeRecordedRef = useRef(false);
+
+  const markUrgeResisted = () => {
+    if (urgeRecordedRef.current) return;
+    urgeRecordedRef.current = true;
+    recordUrgeResisted().catch(() => {});
+  };
 
   const loadPersonalReason = useCallback(async () => {
     setReasonLoading(true);
@@ -62,6 +70,7 @@ export default function CrisisLockScreen() {
     setCalmingIndex(0);
     setSupportMessage(getRandomSupportMessage());
     fadeAnim.setValue(1);
+    urgeRecordedRef.current = false;
   }, [fadeAnim]);
 
   useFocusEffect(
@@ -110,7 +119,13 @@ export default function CrisisLockScreen() {
     navigation.goBack();
   };
 
+  const finishOkay = () => {
+    markUrgeResisted();
+    closeFlow();
+  };
+
   const openJournal = () => {
+    markUrgeResisted();
     navigation.dispatch(
       CommonActions.navigate({
         name: 'MainTabs',
@@ -189,7 +204,7 @@ export default function CrisisLockScreen() {
                     styles.buttonPrimary,
                     pressed && styles.buttonPressed,
                   ]}
-                  onPress={closeFlow}
+                  onPress={finishOkay}
                 >
                   <Text style={styles.buttonPrimaryText}>I'm okay now</Text>
                 </Pressable>
@@ -267,7 +282,7 @@ export default function CrisisLockScreen() {
                     styles.buttonSecondary,
                     pressed && styles.buttonPressed,
                   ]}
-                  onPress={closeFlow}
+                  onPress={finishOkay}
                 >
                   <Text style={styles.buttonSecondaryText}>I'm okay now</Text>
                 </Pressable>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -11,6 +11,7 @@ import {
 import GhostSafeArea from '../components/GhostSafeArea';
 import { useFocusEffect, useNavigation, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { recordUrgeResisted } from '../utils/achievements';
 
 export const SOS_COUNTDOWN_SECONDS = 60;
 
@@ -24,10 +25,18 @@ export default function SOSModeScreen() {
   const navigation = useNavigation();
   const [secondsLeft, setSecondsLeft] = useState(SOS_COUNTDOWN_SECONDS);
   const [countdownDone, setCountdownDone] = useState(false);
+  const urgeRecordedRef = useRef(false);
+
+  const markUrgeResisted = () => {
+    if (urgeRecordedRef.current) return;
+    urgeRecordedRef.current = true;
+    recordUrgeResisted().catch(() => {});
+  };
 
   const resetFlow = useCallback(() => {
     setSecondsLeft(SOS_COUNTDOWN_SECONDS);
     setCountdownDone(false);
+    urgeRecordedRef.current = false;
   }, []);
 
   useFocusEffect(
@@ -56,7 +65,13 @@ export default function SOSModeScreen() {
     navigation.goBack();
   };
 
+  const finishOkay = () => {
+    markUrgeResisted();
+    closeFlow();
+  };
+
   const openCoach = () => {
+    markUrgeResisted();
     navigation.dispatch(
       CommonActions.navigate({
         name: 'MainTabs',
@@ -67,6 +82,7 @@ export default function SOSModeScreen() {
   };
 
   const openJournal = () => {
+    markUrgeResisted();
     navigation.dispatch(
       CommonActions.navigate({
         name: 'MainTabs',
@@ -169,7 +185,7 @@ export default function SOSModeScreen() {
 
         <Pressable
           style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-          onPress={closeFlow}
+          onPress={finishOkay}
         >
           <Text style={styles.secondaryText}>I&apos;m okay for now</Text>
         </Pressable>

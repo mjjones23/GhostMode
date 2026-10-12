@@ -19,6 +19,7 @@ import { useStreak } from '../context/StreakContext';
 import ReminderTimePicker from '../components/ReminderTimePicker';
 import KeyboardAwareScrollScreen from '../components/KeyboardAwareScrollScreen';
 import { dismissKeyboard } from '../utils/keyboard';
+import { daysAgoDateKey } from '../utils/dateMath';
 
 const START_PRESETS = [
   { label: 'Today', daysAgo: 0 },
@@ -28,12 +29,6 @@ const START_PRESETS = [
   { label: '2 weeks ago', daysAgo: 14 },
 ];
 
-function daysAgoIso(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().split('T')[0];
-}
-
 export default function SetupScreen({ navigation }) {
   const { refreshStreak } = useStreak();
   const [startPresetIndex, setStartPresetIndex] = useState(0);
@@ -41,7 +36,7 @@ export default function SetupScreen({ navigation }) {
   const [reminderTime, setReminderTime] = useState('9:00 PM');
   const [saving, setSaving] = useState(false);
 
-  const startDate = daysAgoIso(START_PRESETS[startPresetIndex].daysAgo);
+  const startDate = daysAgoDateKey(START_PRESETS[startPresetIndex].daysAgo);
 
   const cycleStartDate = () => {
     setStartPresetIndex((i) => (i + 1) % START_PRESETS.length);

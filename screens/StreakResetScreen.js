@@ -13,7 +13,7 @@ import GhostSafeArea from '../components/GhostSafeArea';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStreak } from '../context/StreakContext';
-import { resetNoContactStreak } from '../utils/storage';
+import { resetStreakKeepingProgress } from '../utils/achievements';
 
 export default function StreakResetScreen() {
   const navigation = useNavigation();
@@ -26,7 +26,7 @@ export default function StreakResetScreen() {
 
     setResetting(true);
     try {
-      await resetNoContactStreak();
+      await resetStreakKeepingProgress();
       await refreshStreak();
       setPhase('success');
     } finally {
@@ -54,6 +54,9 @@ export default function StreakResetScreen() {
             <Text style={styles.message}>
               Resetting your streak does not mean you failed. It means you start
               again with more awareness.
+            </Text>
+            <Text style={styles.message}>
+              Your level and every badge you've earned stay with you.
             </Text>
 
             <View style={styles.actions}>
@@ -102,8 +105,8 @@ export default function StreakResetScreen() {
             <View style={styles.successCard}>
               <Text style={styles.successLabel}>You're not starting from zero</Text>
               <Text style={styles.successText}>
-                You still have your reasons, journal, and every lesson from before.
-                Keep going.
+                You still have your reasons, journal, level, every badge you've earned,
+                and every lesson from before. Keep going.
               </Text>
             </View>
 

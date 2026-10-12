@@ -69,7 +69,7 @@ function PlanActivityRow({ activity, onToggle, onOpen }) {
   );
 }
 
-export default function DailyRecoveryPlanCard({ refreshKey, onOpenActivity }) {
+export default function DailyRecoveryPlanCard({ refreshKey, onOpenActivity, onPlanChange }) {
   const [plan, setPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const planDateRef = useRef(null);
@@ -127,10 +127,11 @@ export default function DailyRecoveryPlanCard({ refreshKey, onOpenActivity }) {
       const result = await toggleRecoveryPlanActivity(activityId);
       planDateRef.current = result.date;
       setPlan(result);
+      onPlanChange?.();
     } catch {
       loadPlan();
     }
-  }, [loadPlan]);
+  }, [loadPlan, onPlanChange]);
 
   const progress = plan?.progress;
   const stage = plan?.stageMeta;

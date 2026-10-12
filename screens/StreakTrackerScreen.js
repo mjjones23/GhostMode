@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import ProgressRing from '../components/ProgressRing';
 import MilestoneConfetti from '../components/MilestoneConfetti';
 import DailyRecoveryPlanCard from '../components/DailyRecoveryPlanCard';
+import AchievementsSummaryCard from '../components/AchievementsSummaryCard';
+import { AchievementMedal } from '../components/AchievementBadge';
 import { useStreak } from '../context/StreakContext';
 import {
   getTodaysHealingMessage,
@@ -23,8 +25,6 @@ import {
   loadReasons,
   getTodaysCheckIn,
   saveDailyCheckIn,
-  getLastCelebratedMilestone,
-  setLastCelebratedMilestone,
 } from '../utils/storage';
 import {
   getCheckInMoodMeta,
@@ -33,13 +33,9 @@ import {
 } from '../content/dailyCheckInContent';
 import { QUOTE_CATEGORY_LABELS } from '../content/recoveryQuotes';
 import { navigateToAppScreen } from '../navigation/navigationHelpers';
-import {
-  getAllBadgesWithStatus,
-  getCelebrationMessage,
-  getMilestoneProgress,
-  getMilestoneReachedToday,
-  getRecoveryLevel,
-} from '../utils/streakMilestones';
+import { describeMilestoneStatus, getStreakMilestoneProgress } from '../utils/streakMilestones';
+import { dismissAchievementCelebrations, evaluateAchievements } from '../utils/achievements';
+import { isValidDateKey, toDateKey } from '../utils/dateMath';
 
 const QUICK_ACTIONS = [
   {
@@ -141,7 +137,7 @@ function QuickAction({ action, onPress, variant = 'row' }) {
 
 export default function StreakTrackerScreen() {
   const navigation = useNavigation();
-  const { streakDay, refreshStreak } = useStreak();
+  const { streakDay, startDate, refreshStreak } = useStreak();
   const [healingMessage, setHealingMessage] = useState('');
   const [messageIndex, setMessageIndex] = useState(0);
   const [messageLoading, setMessageLoading] = useState(true);
@@ -155,15 +151,26 @@ export default function StreakTrackerScreen() {
   const [todayCheckIn, setTodayCheckIn] = useState(null);
   const [checkInLoading, setCheckInLoading] = useState(true);
   const [savingCheckIn, setSavingCheckIn] = useState(false);
-  const [celebrationMilestone, setCelebrationMilestone] = useState(null);
-  const [showConfetti, setShowConfetti] = useState(false);
+  const [achievements, setAchievements] = useState(null);
 
-  const recoveryLevel = useMemo(() => getRecoveryLevel(streakDay), [streakDay]);
-  const milestoneProgress = useMemo(
-    () => getMilestoneProgress(streakDay),
-    [streakDay]
-  );
-  const badges = useMemo(() => getAllBadgesWithStatus(streakDay), [streakDay]);
+  const milestoneProgress = useMemo(() => {
+    const today = toDateKey();
+    const startKey = String(startDate || '').slice(0, 10);
+    return getStreakMilestoneProgress(isValidDateKey(startKey) ? startKey : today, today);
+    // streakDay changes when the calendar day rolls over, so it re-runs this.
+  }, [startDate, streakDay]);
+
+  const refreshAchievements = useCallback(async () => {
+    try {
+      setAchievements(await evaluateAchievements());
+    } catch {
+      // Keep the last view; the next focus retries.
+    }
+  }, []);
+
+  const celebrations = achievements?.celebrations || [];
+  const welcome = celebrations.length ? null : achievements?.welcome;
+  const showConfetti = celebrations.length > 0;
 
   const loadHealingMessage = useCallback(async () => {
     const result = await getTodaysHealingMessage();
@@ -180,27 +187,17 @@ export default function StreakTrackerScreen() {
     setQuoteLoading(false);
   }, []);
 
-  const checkMilestoneCelebration = useCallback(async (day) => {
-    const reached = getMilestoneReachedToday(day);
-    if (!reached) {
-      setCelebrationMilestone(null);
-      setShowConfetti(false);
-      return;
-    }
-
-    const lastCelebrated = await getLastCelebratedMilestone();
-    if (lastCelebrated != null && lastCelebrated >= reached) {
-      return;
-    }
-
-    await setLastCelebratedMilestone(reached);
-    setCelebrationMilestone(reached);
-    setShowConfetti(true);
+  const dismissCelebrations = useCallback(() => {
+    setAchievements((current) =>
+      current ? { ...current, celebrations: [], welcome: null } : current
+    );
+    dismissAchievementCelebrations().catch(() => {});
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       refreshStreak();
+      refreshAchievements();
       loadHealingMessage();
       loadRecoveryQuote();
       loadReasons().then((reasons) => setReasonCount(reasons.length));
@@ -208,13 +205,7 @@ export default function StreakTrackerScreen() {
       getTodaysCheckIn()
         .then((checkIn) => setTodayCheckIn(checkIn))
         .finally(() => setCheckInLoading(false));
-    }, [refreshStreak, loadHealingMessage, loadRecoveryQuote])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      checkMilestoneCelebration(streakDay);
-    }, [streakDay, checkMilestoneCelebration])
+    }, [refreshStreak, refreshAchievements, loadHealingMessage, loadRecoveryQuote])
   );
 
   const handleNewMessage = async () => {
@@ -262,10 +253,11 @@ export default function StreakTrackerScreen() {
     try {
       const saved = await saveDailyCheckIn(moodId);
       setTodayCheckIn(saved);
+      refreshAchievements();
     } finally {
       setSavingCheckIn(false);
     }
-  }, [savingCheckIn]);
+  }, [savingCheckIn, refreshAchievements]);
 
   const handleAction = (route) => {
     navigateToScreen(route);
@@ -300,46 +292,87 @@ export default function StreakTrackerScreen() {
             <View>
               <Text style={styles.streakLabel}>No-contact streak</Text>
               <Text style={styles.dayCount}>Day {streakDay}</Text>
-              <View style={styles.levelRow}>
-                <Text style={styles.levelEmoji}>{recoveryLevel.emoji}</Text>
-                <Text style={[styles.levelText, { color: recoveryLevel.color }]}>
-                  {recoveryLevel.label}
-                </Text>
-              </View>
+              {achievements && (
+                <Pressable
+                  style={({ pressed }) => [styles.levelRow, pressed && styles.buttonPressed]}
+                  onPress={() => navigateToScreen('Achievements')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${achievements.level.title}. View achievements`}
+                >
+                  <Ionicons name="sparkles" size={14} color="#c4b5fd" />
+                  <Text style={styles.levelText}>{achievements.level.title}</Text>
+                </Pressable>
+              )}
               <Text style={styles.healingSubtitle}>
-                {milestoneProgress.isMaxed
-                  ? 'Every milestone unlocked. Keep going.'
-                  : milestoneProgress.isComplete
-                    ? `Milestone reached — Day ${milestoneProgress.next}`
-                    : `Next milestone: Day ${milestoneProgress.next}`}
+                {describeMilestoneStatus(milestoneProgress)}
               </Text>
             </View>
           </View>
           <View style={styles.ringWrap}>
-            <ProgressRing day={streakDay} size={168} strokeWidth={10} />
+            <ProgressRing milestone={milestoneProgress} size={168} strokeWidth={10} />
           </View>
         </View>
 
-        {celebrationMilestone != null && (
+        {celebrations.length > 0 && (
           <View style={styles.celebrationCard}>
-            <Text style={styles.celebrationBadge}>Milestone unlocked</Text>
-            <Text style={styles.celebrationTitle}>
-              Day {celebrationMilestone}
+            <Text style={styles.celebrationBadge}>
+              {celebrations[0].again ? 'Milestone reached again' : 'Achievement unlocked'}
             </Text>
-            <Text style={styles.celebrationMessage}>
-              {getCelebrationMessage(celebrationMilestone)}
-            </Text>
+            <AchievementMedal badge={celebrations[0]} size="lg" />
+            <Text style={styles.celebrationTitle}>{celebrations[0].title}</Text>
+            <Text style={styles.celebrationSubtitle}>{celebrations[0].subtitle}</Text>
+            <Text style={styles.celebrationMessage}>{celebrations[0].message}</Text>
+            {celebrations.length > 1 && (
+              <Pressable
+                style={({ pressed }) => [styles.celebrationMore, pressed && styles.buttonPressed]}
+                onPress={() => {
+                  dismissCelebrations();
+                  navigateToScreen('Achievements');
+                }}
+              >
+                <Text style={styles.celebrationMoreText}>
+                  +{celebrations.length - 1} more unlocked · See them all
+                </Text>
+              </Pressable>
+            )}
             <Pressable
               style={({ pressed }) => [
                 styles.celebrationDismiss,
                 pressed && styles.buttonPressed,
               ]}
-              onPress={() => {
-                setShowConfetti(false);
-                setCelebrationMilestone(null);
-              }}
+              onPress={dismissCelebrations}
             >
               <Text style={styles.celebrationDismissText}>Keep going</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {welcome && (
+          <View style={styles.celebrationCard}>
+            <Text style={styles.celebrationBadge}>New in Ghost Mode</Text>
+            <Text style={styles.celebrationTitle}>Achievements & Levels</Text>
+            <Text style={styles.celebrationMessage}>
+              {`We looked back at your journey and found ${welcome.count} ${
+                welcome.count === 1 ? 'achievement' : 'achievements'
+              } you've already earned. They're yours to keep.`}
+            </Text>
+            <Pressable
+              style={({ pressed }) => [styles.celebrationMore, pressed && styles.buttonPressed]}
+              onPress={() => {
+                dismissCelebrations();
+                navigateToScreen('Achievements');
+              }}
+            >
+              <Text style={styles.celebrationMoreText}>See your achievements</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.celebrationDismiss,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={dismissCelebrations}
+            >
+              <Text style={styles.celebrationDismissText}>Got it</Text>
             </Pressable>
           </View>
         )}
@@ -347,52 +380,13 @@ export default function StreakTrackerScreen() {
         <DailyRecoveryPlanCard
           refreshKey={todayCheckIn?.mood ?? null}
           onOpenActivity={navigateToScreen}
+          onPlanChange={refreshAchievements}
         />
 
-        <View style={styles.badgesCard}>
-          <View style={styles.badgesHeader}>
-            <Ionicons name="ribbon-outline" size={16} color="#e9d5ff" />
-            <Text style={styles.badgesTitle}>Achievement Badges</Text>
-          </View>
-          <View style={styles.badgesGrid}>
-            {badges.map((badge) => (
-              <View
-                key={badge.id}
-                style={[
-                  styles.badgeItem,
-                  !badge.unlocked && styles.badgeItemLocked,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.badgeEmoji,
-                    !badge.unlocked && styles.badgeEmojiLocked,
-                  ]}
-                >
-                  {badge.emoji}
-                </Text>
-                <Text
-                  style={[
-                    styles.badgeLabel,
-                    !badge.unlocked && styles.badgeLabelLocked,
-                  ]}
-                >
-                  {badge.label}
-                </Text>
-                <Text
-                  style={[
-                    styles.badgeStatus,
-                    badge.unlocked
-                      ? styles.badgeStatusUnlocked
-                      : styles.badgeStatusLocked,
-                  ]}
-                >
-                  {badge.unlocked ? 'Unlocked' : 'Locked'}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
+        <AchievementsSummaryCard
+          achievements={achievements}
+          onViewAll={() => navigateToScreen('Achievements')}
+        />
 
         <Pressable
           style={({ pressed }) => [
@@ -731,10 +725,8 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 8,
   },
-  levelEmoji: {
-    fontSize: 16,
-  },
   levelText: {
+    color: '#c4b5fd',
     fontSize: 15,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -781,7 +773,25 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     letterSpacing: -0.5,
+    marginTop: 12,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  celebrationSubtitle: {
+    color: '#c4b5fd',
+    fontSize: 13,
+    fontWeight: '700',
     marginBottom: 10,
+  },
+  celebrationMore: {
+    paddingVertical: 6,
+    marginBottom: 12,
+  },
+  celebrationMoreText: {
+    color: '#e9d5ff',
+    fontSize: 14,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   celebrationMessage: {
     color: 'rgba(255, 255, 255, 0.85)',
@@ -802,77 +812,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '700',
-  },
-  badgesCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.2)',
-    marginBottom: 16,
-  },
-  badgesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
-  },
-  badgesTitle: {
-    color: '#e9d5ff',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  badgesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  badgeItem: {
-    width: '22%',
-    minWidth: 70,
-    flexGrow: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-    borderRadius: 14,
-    backgroundColor: 'rgba(124, 58, 237, 0.16)',
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.35)',
-  },
-  badgeItemLocked: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  badgeEmoji: {
-    fontSize: 22,
-    marginBottom: 6,
-  },
-  badgeEmojiLocked: {
-    opacity: 0.35,
-  },
-  badgeLabel: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  badgeLabelLocked: {
-    color: 'rgba(255, 255, 255, 0.35)',
-  },
-  badgeStatus: {
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  badgeStatusUnlocked: {
-    color: '#86efac',
-  },
-  badgeStatusLocked: {
-    color: 'rgba(255, 255, 255, 0.28)',
   },
   sosButton: {
     flexDirection: 'row',

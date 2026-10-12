@@ -3,14 +3,17 @@ import { getOrInitNoContactStart, getStreakDay } from '../utils/storage';
 
 const StreakContext = createContext({
   streakDay: 1,
+  startDate: null,
   refreshStreak: async () => {},
 });
 
 export function StreakProvider({ children }) {
   const [streakDay, setStreakDay] = useState(1);
+  const [startDate, setStartDate] = useState(null);
 
   const refreshStreak = useCallback(async () => {
     const start = await getOrInitNoContactStart();
+    setStartDate(start);
     setStreakDay(getStreakDay(start));
   }, []);
 
@@ -19,7 +22,7 @@ export function StreakProvider({ children }) {
   }, [refreshStreak]);
 
   return (
-    <StreakContext.Provider value={{ streakDay, refreshStreak }}>
+    <StreakContext.Provider value={{ streakDay, startDate, refreshStreak }}>
       {children}
     </StreakContext.Provider>
   );

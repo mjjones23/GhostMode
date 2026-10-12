@@ -38,6 +38,7 @@ import { dismissKeyboard } from '../utils/keyboard';
 import { useAuth } from '../context/AuthContext';
 import { navigateToAppScreen } from '../navigation/navigationHelpers';
 import ScreenLoader from '../components/ScreenLoader';
+import { daysAgoDateKey } from '../utils/dateMath';
 
 const START_PRESETS_DAYS_AGO = [0, 7, 12, 30];
 
@@ -57,12 +58,6 @@ function SettingsRow({ label, value, onPress, showChevron = true }) {
       </View>
     </Pressable>
   );
-}
-
-function daysAgoIso(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().split('T')[0];
 }
 
 export default function SettingsScreen() {
@@ -107,7 +102,7 @@ export default function SettingsScreen() {
   const changeStartDate = async () => {
     const nextIndex = (presetIndex + 1) % START_PRESETS_DAYS_AGO.length;
     const daysAgo = START_PRESETS_DAYS_AGO[nextIndex];
-    const iso = daysAgoIso(daysAgo);
+    const iso = daysAgoDateKey(daysAgo);
     setPresetIndex(nextIndex);
     setStartDateIso(iso);
     await saveNoContactStart(iso);

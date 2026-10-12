@@ -1,8 +1,11 @@
 import { StyleSheet, Text, View } from 'react-native';
-import { getMilestoneProgress } from '../utils/streakMilestones';
 
-export default function ProgressRing({ day, size = 200, strokeWidth = 12 }) {
-  const milestone = getMilestoneProgress(day);
+function milestoneLabel(event) {
+  return event.kind === 'year' ? event.label : `Day ${event.value}`;
+}
+
+/** `milestone` is the object returned by getStreakMilestoneProgress. */
+export default function ProgressRing({ milestone, size = 200, strokeWidth = 12 }) {
   const progress = milestone.progress;
   const angle = progress * 360;
   const half = size / 2;
@@ -10,11 +13,9 @@ export default function ProgressRing({ day, size = 200, strokeWidth = 12 }) {
   const rightRotation = Math.min(angle, 180) - 90;
   const leftRotation = angle > 180 ? angle - 180 - 90 : -90;
 
-  const goalLabel = milestone.isMaxed
-    ? 'all milestones'
-    : milestone.isComplete
-      ? `${milestone.next} days`
-      : `to Day ${milestone.next}`;
+  const goalLabel = milestone.isComplete
+    ? milestoneLabel(milestone.reachedToday)
+    : `to ${milestoneLabel(milestone.next)}`;
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
@@ -66,7 +67,7 @@ export default function ProgressRing({ day, size = 200, strokeWidth = 12 }) {
       <View style={styles.center}>
         <Text style={styles.percent}>{milestone.percent}%</Text>
         <Text style={styles.goalLabel}>{goalLabel}</Text>
-        {!milestone.isMaxed && !milestone.isComplete && (
+        {!milestone.isComplete && (
           <Text style={styles.fractionLabel}>
             {milestone.current}/{milestone.total}
           </Text>

@@ -18,6 +18,7 @@ import DailyReminderScreen from '../screens/DailyReminderScreen';
 import ReasonsScreen from '../screens/ReasonsScreen';
 import StreakResetScreen from '../screens/StreakResetScreen';
 import ProgressInsightsScreen from '../screens/ProgressInsightsScreen';
+import AchievementsScreen from '../screens/AchievementsScreen';
 import LegalDocumentScreen from '../screens/LegalDocumentScreen';
 import SafetyDisclaimerScreen from '../screens/SafetyDisclaimerScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -165,6 +166,7 @@ export default function RootNavigator() {
         <Stack.Screen name="MainTabs" component={MainTabs} />
         <Stack.Screen name="Reasons" component={ReasonsScreen} />
         <Stack.Screen name="ProgressInsights" component={ProgressInsightsScreen} />
+        <Stack.Screen name="Achievements" component={AchievementsScreen} />
         <Stack.Screen
           name="StreakReset"
           component={StreakResetScreen}
