@@ -56,3 +56,9 @@ Ghost Mode AI is actively being improved through testing, user feedback, and fea
 Ghost Mode AI demonstrates practical experience in mobile application development, AI integration, debugging, software testing, and application deployment.
 
 The goal is to continue improving the application while developing real-world software engineering skills.
+
+## Download Ghost Mode AI
+
+Ghost Mode AI is available on the Apple App Store.
+
+[Download Ghost Mode AI on the App Store](https://apps.apple.com/us/app/ghost-mode-ai/id6777762241)
