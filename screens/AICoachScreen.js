@@ -27,6 +27,7 @@ import {
   checkBackendStatus,
   fetchCoachReply,
 } from '../services/aiService';
+import { loadCoachPersonalizationContext } from '../utils/coachContext';
 
 const INITIAL_MESSAGES = [
   {
@@ -356,7 +357,13 @@ export default function AICoachScreen() {
     const started = Date.now();
 
     try {
-      const result = await fetchCoachReply({ userText, chatHistory });
+      // Only loads streak/mood/goal when the user opted in (default OFF).
+      const personalizationContext = await loadCoachPersonalizationContext();
+      const result = await fetchCoachReply({
+        userText,
+        chatHistory,
+        personalizationContext,
+      });
       setLastReplyMode(result.mode || 'mock');
       await waitForRealisticReplyDelay(started);
 

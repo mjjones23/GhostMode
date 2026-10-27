@@ -1,6 +1,7 @@
 import { detectCrisis, CRISIS_REPLY } from '../utils/crisisSafety';
 import { getMockReply } from '../utils/mockCoach';
 import { getCoachApiUrl, isCoachApiConfigured } from '../config/api';
+import { sanitizeCoachContextPayload } from '../utils/coachContext';
 
 const REQUEST_TIMEOUT_MS = 12000;
 const HEALTH_TIMEOUT_MS = 5000;
@@ -37,7 +38,7 @@ function getLatestUserText(chatHistory) {
   return '';
 }
 
-async function postChat(messages, userMessage) {
+async function postChat(messages, userMessage, personalizationContext = null) {
   const baseUrl = getCoachApiUrl();
   if (!baseUrl) {
     return {
@@ -49,7 +50,16 @@ async function postChat(messages, userMessage) {
   }
 
   const requestBody = { messages, userMessage };
-  console.log('[AI Coach] request body sent to backend:', JSON.stringify(requestBody));
+  if (personalizationContext) {
+    requestBody.context = personalizationContext;
+  }
+
+  // Log shape only — never dump full private content beyond allowlisted context fields.
+  console.log('[AI Coach] request sent to backend:', {
+    messageCount: messages.length,
+    hasContext: Boolean(personalizationContext),
+    contextKeys: personalizationContext ? Object.keys(personalizationContext) : [],
+  });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -151,11 +161,19 @@ function fallbackReply(userText) {
  * Gets a coach reply: tries POST /chat on the backend first,
  * then falls back to in-app mock replies. Never throws.
  * Never sends or exposes OpenAI API keys from the mobile app.
+ *
+ * personalizationContext is only included when the caller already checked
+ * the user opt-in and built a sanitized payload (or null).
  */
-export async function fetchCoachReply({ userText, chatHistory = [] }) {
+export async function fetchCoachReply({
+  userText,
+  chatHistory = [],
+  personalizationContext = null,
+} = {}) {
   const trimmedFromArg = String(userText || '').trim();
   const trimmedFromHistory = getLatestUserText(chatHistory);
   const trimmed = trimmedFromArg || trimmedFromHistory;
+  const safeContext = sanitizeCoachContextPayload(personalizationContext);
 
   if (!trimmed) {
     return {
@@ -163,6 +181,7 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
       crisis: false,
       source: 'mock',
       mode: 'mock',
+      contextUsed: false,
     };
   }
 
@@ -172,6 +191,7 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
       crisis: true,
       source: 'local',
       mode: 'mock',
+      contextUsed: false,
     };
   }
 
@@ -181,6 +201,7 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
       crisis: false,
       source: 'mock',
       mode: 'mock',
+      contextUsed: false,
       error: NOT_CONFIGURED_MESSAGE,
     };
   }
@@ -188,7 +209,7 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
   const messages = buildApiMessages(chatHistory);
 
   try {
-    const { ok, data, error } = await postChat(messages, trimmed);
+    const { ok, data, error } = await postChat(messages, trimmed, safeContext);
 
     if (ok && typeof data.reply === 'string' && data.reply.trim()) {
       return {
@@ -196,6 +217,7 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
         crisis: Boolean(data.crisis),
         source: data.source === 'backend' ? 'backend' : 'server',
         mode: data.mode || 'mock',
+        contextUsed: Boolean(data.contextUsed) || Boolean(safeContext),
       };
     }
 
@@ -204,6 +226,7 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
       crisis: false,
       source: 'mock',
       mode: 'mock',
+      contextUsed: false,
       error: error || OFFLINE_USER_MESSAGE,
     };
   } catch {
@@ -215,6 +238,7 @@ export async function fetchCoachReply({ userText, chatHistory = [] }) {
     crisis: false,
     source: 'mock',
     mode: 'mock',
+    contextUsed: false,
     error: OFFLINE_USER_MESSAGE,
   };
 }

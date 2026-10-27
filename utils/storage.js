@@ -41,6 +41,8 @@ export const STORAGE_KEYS = {
   LAST_CELEBRATED_MILESTONE: '@ghostmode/last_celebrated_milestone',
   DAILY_PLANS: '@ghostmode/daily_plans',
   ACHIEVEMENTS: '@ghostmode/achievements',
+  /** AI Coach personalization share — default OFF when missing. */
+  COACH_CONTEXT_SHARE: '@ghostmode/coach_context_share',
 };
 
 export const GOAL_OPTIONS = [
@@ -954,6 +956,22 @@ export async function saveCoachChat(messages) {
 /** Removes saved AI Coach conversation from the phone. */
 export async function clearCoachChat() {
   await AsyncStorage.removeItem(STORAGE_KEYS.COACH_CHAT);
+}
+
+/**
+ * Whether the user opted in to share streak/mood/goal with AI Coach.
+ * Missing key = false (privacy default).
+ */
+export async function loadCoachContextShareEnabled() {
+  const value = await AsyncStorage.getItem(STORAGE_KEYS.COACH_CONTEXT_SHARE);
+  return value === 'true';
+}
+
+export async function saveCoachContextShareEnabled(enabled) {
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.COACH_CONTEXT_SHARE,
+    enabled ? 'true' : 'false'
+  );
 }
 
 export async function clearAllAppData() {

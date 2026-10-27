@@ -1,6 +1,6 @@
-const path = require('path');
 const OpenAI = require('openai');
 const { COACH_SYSTEM_PROMPT } = require('./coachPrompt');
+const { formatContextForPrompt } = require('./coachContext');
 
 let openaiClient = null;
 
@@ -56,8 +56,9 @@ function buildOpenAIMessages(messages, latestUserText) {
 
 /**
  * Calls OpenAI for a coach reply. Throws if the API fails or key is missing.
+ * @param {object|null} personalizationContext - already sanitized opt-in context
  */
-async function generateOpenAIReply(messages, latestUserText) {
+async function generateOpenAIReply(messages, latestUserText, personalizationContext = null) {
   const openai = getOpenAIClient();
 
   if (!openai) {
@@ -72,8 +73,14 @@ async function generateOpenAIReply(messages, latestUserText) {
 
   const openaiMessages = [
     { role: 'system', content: COACH_SYSTEM_PROMPT },
-    ...sanitized,
   ];
+
+  const contextBlock = formatContextForPrompt(personalizationContext);
+  if (contextBlock) {
+    openaiMessages.push({ role: 'system', content: contextBlock });
+  }
+
+  openaiMessages.push(...sanitized);
 
   console.log(
     '[AI Coach] message sent to OpenAI (latest user turn):',

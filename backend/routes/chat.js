@@ -2,6 +2,7 @@ const express = require('express');
 const { detectCrisis, CRISIS_REPLY } = require('../crisisSafety');
 const { getMockReply } = require('../mockCoach');
 const { generateOpenAIReply, isOpenAIConfigured } = require('../openaiCoach');
+const { sanitizeCoachContext } = require('../coachContext');
 
 const router = express.Router();
 
@@ -27,7 +28,11 @@ function mockResponse(userText, reason) {
 
 router.post('/chat', async (req, res) => {
   try {
-    const { messages, userMessage: userMessageField } = req.body;
+    const {
+      messages,
+      userMessage: userMessageField,
+      context: rawContext,
+    } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'messages array is required' });
@@ -40,13 +45,19 @@ router.post('/chat', async (req, res) => {
     }
 
     const userText = String(userMessageField || lastUser.content).trim();
+    const personalizationContext = sanitizeCoachContext(rawContext);
 
     console.log('[AI Coach] message received by backend:', userText);
+    console.log(
+      '[AI Coach] personalization context:',
+      personalizationContext ? 'present (sanitized)' : 'none'
+    );
 
     if (!userText) {
       return res.status(400).json({ error: 'user message is required' });
     }
 
+    // Crisis always wins — context is ignored for coaching in this path.
     if (detectCrisis(userText)) {
       return res.json(crisisResponse());
     }
@@ -55,7 +66,11 @@ router.post('/chat', async (req, res) => {
       console.log('[AI Coach] OpenAI called: attempting');
 
       try {
-        const reply = await generateOpenAIReply(messages, userText);
+        const reply = await generateOpenAIReply(
+          messages,
+          userText,
+          personalizationContext
+        );
 
         if (detectCrisis(reply)) {
           return res.json(crisisResponse());
@@ -69,6 +84,7 @@ router.post('/chat', async (req, res) => {
           crisis: false,
           source: 'backend',
           mode: 'openai',
+          contextUsed: Boolean(personalizationContext),
         });
       } catch (error) {
         console.log('[AI Coach] OpenAI called: yes (failed)');

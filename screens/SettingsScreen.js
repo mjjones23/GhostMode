@@ -20,6 +20,8 @@ import {
   saveReminderSettings,
   formatDisplayDate,
   clearAllAppData,
+  loadCoachContextShareEnabled,
+  saveCoachContextShareEnabled,
 } from '../utils/storage';
 import { useStreak } from '../context/StreakContext';
 import { usePremium } from '../context/PremiumContext';
@@ -70,18 +72,21 @@ export default function SettingsScreen() {
   const [startDateIso, setStartDateIso] = useState(null);
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState('9:00 PM');
+  const [coachContextShare, setCoachContextShare] = useState(false);
   const [loading, setLoading] = useState(true);
   const [presetIndex, setPresetIndex] = useState(2);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
 
   const loadAll = useCallback(async () => {
-    const [start, reminder] = await Promise.all([
+    const [start, reminder, shareContext] = await Promise.all([
       loadNoContactStart(),
       loadReminderSettings(),
+      loadCoachContextShareEnabled(),
     ]);
     if (start) setStartDateIso(start);
     setReminderEnabled(isPremium ? reminder.enabled : false);
     setNotificationTime(reminder.time);
+    setCoachContextShare(Boolean(shareContext));
     setLoading(false);
   }, [isPremium]);
 
@@ -136,6 +141,11 @@ export default function SettingsScreen() {
         ? `Daily notification set for ${next}.`
         : `Saved for ${next}. Turn on daily reminder to schedule it.`
     );
+  };
+
+  const toggleCoachContextShare = async (value) => {
+    setCoachContextShare(value);
+    await saveCoachContextShareEnabled(value);
   };
 
   const toggleReminder = async (value) => {
@@ -401,6 +411,27 @@ export default function SettingsScreen() {
 
         <Text style={styles.sectionTitle}>Privacy & Safety</Text>
         <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.rowLabelWrap}>
+              <Text style={styles.rowLabel}>Share recovery context with AI Coach</Text>
+            </View>
+            <Switch
+              value={coachContextShare}
+              onValueChange={toggleCoachContextShare}
+              trackColor={{
+                false: 'rgba(255,255,255,0.15)',
+                true: 'rgba(124, 58, 237, 0.5)',
+              }}
+              thumbColor={coachContextShare ? '#a78bfa' : '#f4f4f5'}
+              ios_backgroundColor="rgba(255,255,255,0.15)"
+            />
+          </View>
+          <Text style={styles.rowHint}>
+            Off by default. When on, Ghost Mode may share only your no-contact
+            streak day, today&apos;s mood, and recovery goal with the AI Coach —
+            never your journal, email, or password.
+          </Text>
+          <View style={styles.divider} />
           <SettingsRow label="Privacy Policy" onPress={openPrivacy} />
           <View style={styles.divider} />
           <SettingsRow label="Safety Disclaimer" onPress={openSafetyDisclaimer} />
