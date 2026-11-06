@@ -3,6 +3,7 @@ const { detectCrisis, CRISIS_REPLY } = require('../crisisSafety');
 const { getMockReply } = require('../mockCoach');
 const { generateOpenAIReply, isOpenAIConfigured } = require('../openaiCoach');
 const { sanitizeCoachContext } = require('../coachContext');
+const { memoriesAllowedForPrompt } = require('../coachMemory');
 
 const router = express.Router();
 
@@ -32,6 +33,7 @@ router.post('/chat', async (req, res) => {
       messages,
       userMessage: userMessageField,
       context: rawContext,
+      memories: rawMemories,
     } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -57,10 +59,21 @@ router.post('/chat', async (req, res) => {
       return res.status(400).json({ error: 'user message is required' });
     }
 
-    // Crisis always wins — context is ignored for coaching in this path.
+    // Crisis always wins — context and saved memories are not sent to the model.
     if (detectCrisis(userText)) {
+      console.log('[AI Coach] saved memories: ignored for crisis');
       return res.json(crisisResponse());
     }
+
+    const savedMemories = memoriesAllowedForPrompt(
+      userText,
+      rawMemories,
+      detectCrisis
+    );
+    console.log(
+      '[AI Coach] saved memories:',
+      savedMemories ? savedMemories.length : 0
+    );
 
     if (isOpenAIConfigured()) {
       console.log('[AI Coach] OpenAI called: attempting');
@@ -69,7 +82,8 @@ router.post('/chat', async (req, res) => {
         const reply = await generateOpenAIReply(
           messages,
           userText,
-          personalizationContext
+          personalizationContext,
+          savedMemories
         );
 
         if (detectCrisis(reply)) {

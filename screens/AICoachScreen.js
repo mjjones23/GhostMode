@@ -15,7 +15,12 @@ import {
 import GhostSafeArea from '../components/GhostSafeArea';
 import RecoveryActionsSection from '../components/RecoveryActionsSection';
 import { dismissKeyboard, TAB_BAR_KEYBOARD_OFFSET } from '../utils/keyboard';
-import { loadCoachChat, saveCoachChat, clearCoachChat } from '../utils/storage';
+import {
+  loadCoachChat,
+  saveCoachChat,
+  clearCoachChat,
+  loadCoachMemoriesForApi,
+} from '../utils/storage';
 import { MOCK_COACH_ERROR_FALLBACK } from '../utils/mockCoach';
 import {
   getSuggestedRecoveryActions,
@@ -357,12 +362,16 @@ export default function AICoachScreen() {
     const started = Date.now();
 
     try {
-      // Only loads streak/mood/goal when the user opted in (default OFF).
-      const personalizationContext = await loadCoachPersonalizationContext();
+      // Recovery context and saved memories are each opt-in and default OFF.
+      const [personalizationContext, savedMemories] = await Promise.all([
+        loadCoachPersonalizationContext(),
+        loadCoachMemoriesForApi(),
+      ]);
       const result = await fetchCoachReply({
         userText,
         chatHistory,
         personalizationContext,
+        savedMemories,
       });
       setLastReplyMode(result.mode || 'mock');
       await waitForRealisticReplyDelay(started);
@@ -425,7 +434,7 @@ export default function AICoachScreen() {
 
     Alert.alert(
       'Clear chat?',
-      'This removes your conversation with the coach on this device. The welcome messages will come back.',
+      'This removes your conversation with the coach on this device. The welcome messages will come back. Saved memories stay on this device until you delete them in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         {

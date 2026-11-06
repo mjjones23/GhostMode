@@ -20,6 +20,13 @@ import {
   isAppReviewPremiumEmail,
 } from '../config/appReview';
 import { getStreakDayFromDateKeys, toDateKey } from './dateMath';
+import {
+  COACH_MEMORY_MAX_ITEMS,
+  rejectionReasonForMemoryText,
+  sanitizeCoachMemoryList,
+  sanitizeCoachMemoryText,
+  sanitizeStoredMemories,
+} from './coachMemory';
 
 /** Keys used in the phone's local storage (AsyncStorage). */
 export const STORAGE_KEYS = {
@@ -43,6 +50,10 @@ export const STORAGE_KEYS = {
   ACHIEVEMENTS: '@ghostmode/achievements',
   /** AI Coach personalization share — default OFF when missing. */
   COACH_CONTEXT_SHARE: '@ghostmode/coach_context_share',
+  /** User-approved coach memories — separate from the chat transcript. */
+  COACH_MEMORIES: '@ghostmode/coach_memories',
+  /** Send saved memories with coach requests — default OFF when missing. */
+  COACH_MEMORY_ENABLED: '@ghostmode/coach_memory_enabled',
 };
 
 export const GOAL_OPTIONS = [
@@ -953,9 +964,86 @@ export async function saveCoachChat(messages) {
   await writeJson(STORAGE_KEYS.COACH_CHAT, normalized);
 }
 
-/** Removes saved AI Coach conversation from the phone. */
+/**
+ * Removes the saved AI Coach conversation from the phone.
+ * Does not remove user-approved memories.
+ */
 export async function clearCoachChat() {
   await AsyncStorage.removeItem(STORAGE_KEYS.COACH_CHAT);
+}
+
+/**
+ * Whether saved memories may be sent to the coach.
+ * Missing key = false.
+ */
+export async function loadCoachMemoryEnabled() {
+  const value = await AsyncStorage.getItem(STORAGE_KEYS.COACH_MEMORY_ENABLED);
+  return value === 'true';
+}
+
+export async function saveCoachMemoryEnabled(enabled) {
+  await AsyncStorage.setItem(
+    STORAGE_KEYS.COACH_MEMORY_ENABLED,
+    enabled ? 'true' : 'false'
+  );
+}
+
+export async function loadCoachMemories() {
+  const data = await readJson(STORAGE_KEYS.COACH_MEMORIES, []);
+  return sanitizeStoredMemories(data);
+}
+
+export async function addCoachMemory(rawText) {
+  const reason = rejectionReasonForMemoryText(rawText);
+  if (reason) return { ok: false, message: reason };
+
+  const text = sanitizeCoachMemoryText(rawText);
+  const existing = await loadCoachMemories();
+  if (existing.some((memory) => memory.text.toLowerCase() === text.toLowerCase())) {
+    return { ok: false, message: 'That memory is already saved.', memories: existing };
+  }
+  if (existing.length >= COACH_MEMORY_MAX_ITEMS) {
+    return {
+      ok: false,
+      message: 'You can save up to 15 memories. Delete one to add another.',
+      memories: existing,
+    };
+  }
+
+  const memories = [
+    ...existing,
+    {
+      id: `memory-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+      text,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+  await writeJson(STORAGE_KEYS.COACH_MEMORIES, memories);
+  return { ok: true, memories };
+}
+
+export async function deleteCoachMemory(id) {
+  const memories = (await loadCoachMemories()).filter(
+    (memory) => memory.id !== String(id)
+  );
+  await writeJson(STORAGE_KEYS.COACH_MEMORIES, memories);
+  return memories;
+}
+
+export async function clearCoachMemories() {
+  await AsyncStorage.removeItem(STORAGE_KEYS.COACH_MEMORIES);
+}
+
+/**
+ * Memories for POST /chat. Null when the switch is off or nothing safe remains.
+ * Returns text only.
+ */
+export async function loadCoachMemoriesForApi() {
+  const enabled = await loadCoachMemoryEnabled();
+  if (!enabled) return null;
+
+  const memories = sanitizeCoachMemoryList(await loadCoachMemories());
+  return memories.length ? memories : null;
 }
 
 /**

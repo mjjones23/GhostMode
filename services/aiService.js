@@ -2,6 +2,7 @@ import { detectCrisis, CRISIS_REPLY } from '../utils/crisisSafety';
 import { getMockReply } from '../utils/mockCoach';
 import { getCoachApiUrl, isCoachApiConfigured } from '../config/api';
 import { sanitizeCoachContextPayload } from '../utils/coachContext';
+import { sanitizeCoachMemoryList } from '../utils/coachMemory';
 
 const REQUEST_TIMEOUT_MS = 12000;
 const HEALTH_TIMEOUT_MS = 5000;
@@ -38,7 +39,12 @@ function getLatestUserText(chatHistory) {
   return '';
 }
 
-async function postChat(messages, userMessage, personalizationContext = null) {
+async function postChat(
+  messages,
+  userMessage,
+  personalizationContext = null,
+  savedMemories = null
+) {
   const baseUrl = getCoachApiUrl();
   if (!baseUrl) {
     return {
@@ -53,12 +59,16 @@ async function postChat(messages, userMessage, personalizationContext = null) {
   if (personalizationContext) {
     requestBody.context = personalizationContext;
   }
+  if (savedMemories?.length) {
+    requestBody.memories = savedMemories;
+  }
 
-  // Log shape only — never dump full private content beyond allowlisted context fields.
+  // Counts and allowlisted context keys only — never memory text or chat content.
   console.log('[AI Coach] request sent to backend:', {
     messageCount: messages.length,
     hasContext: Boolean(personalizationContext),
     contextKeys: personalizationContext ? Object.keys(personalizationContext) : [],
+    memoryCount: savedMemories?.length || 0,
   });
 
   const controller = new AbortController();
@@ -164,16 +174,19 @@ function fallbackReply(userText) {
  *
  * personalizationContext is only included when the caller already checked
  * the user opt-in and built a sanitized payload (or null).
+ * savedMemories is only included when memory is enabled and the list was sanitized.
  */
 export async function fetchCoachReply({
   userText,
   chatHistory = [],
   personalizationContext = null,
+  savedMemories = null,
 } = {}) {
   const trimmedFromArg = String(userText || '').trim();
   const trimmedFromHistory = getLatestUserText(chatHistory);
   const trimmed = trimmedFromArg || trimmedFromHistory;
   const safeContext = sanitizeCoachContextPayload(personalizationContext);
+  const safeMemories = sanitizeCoachMemoryList(savedMemories);
 
   if (!trimmed) {
     return {
@@ -182,6 +195,7 @@ export async function fetchCoachReply({
       source: 'mock',
       mode: 'mock',
       contextUsed: false,
+      memoriesUsed: false,
     };
   }
 
@@ -192,6 +206,7 @@ export async function fetchCoachReply({
       source: 'local',
       mode: 'mock',
       contextUsed: false,
+      memoriesUsed: false,
     };
   }
 
@@ -202,14 +217,21 @@ export async function fetchCoachReply({
       source: 'mock',
       mode: 'mock',
       contextUsed: false,
+      memoriesUsed: false,
       error: NOT_CONFIGURED_MESSAGE,
     };
   }
 
   const messages = buildApiMessages(chatHistory);
+  const memoriesForRequest = safeMemories.length ? safeMemories : null;
 
   try {
-    const { ok, data, error } = await postChat(messages, trimmed, safeContext);
+    const { ok, data, error } = await postChat(
+      messages,
+      trimmed,
+      safeContext,
+      memoriesForRequest
+    );
 
     if (ok && typeof data.reply === 'string' && data.reply.trim()) {
       return {
@@ -218,6 +240,7 @@ export async function fetchCoachReply({
         source: data.source === 'backend' ? 'backend' : 'server',
         mode: data.mode || 'mock',
         contextUsed: Boolean(data.contextUsed) || Boolean(safeContext),
+        memoriesUsed: Boolean(memoriesForRequest),
       };
     }
 
@@ -227,6 +250,7 @@ export async function fetchCoachReply({
       source: 'mock',
       mode: 'mock',
       contextUsed: false,
+      memoriesUsed: false,
       error: error || OFFLINE_USER_MESSAGE,
     };
   } catch {
@@ -239,6 +263,7 @@ export async function fetchCoachReply({
     source: 'mock',
     mode: 'mock',
     contextUsed: false,
+    memoriesUsed: false,
     error: OFFLINE_USER_MESSAGE,
   };
 }

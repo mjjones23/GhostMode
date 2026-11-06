@@ -8,11 +8,6 @@ export default {
     userInterfaceStyle: 'dark',
     primaryColor: '#7c3aed',
     backgroundColor: '#0a0a12',
-    splash: {
-      image: './assets/splash-icon.png',
-      resizeMode: 'contain',
-      backgroundColor: '#0a0a12',
-    },
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.mjjones.ghostmode',
@@ -36,8 +31,18 @@ export default {
       backgroundColor: '#0a0a12',
     },
     plugins: [
+      [
+        'expo-splash-screen',
+        {
+          backgroundColor: '#0a0a12',
+          image: './assets/splash-icon.png',
+          resizeMode: 'contain',
+          imageWidth: 200,
+        },
+      ],
       'expo-font',
       ['expo-status-bar', { style: 'light' }],
+      '@react-native-community/datetimepicker',
       [
         'expo-notifications',
         {

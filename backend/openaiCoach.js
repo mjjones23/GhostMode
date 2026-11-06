@@ -1,6 +1,7 @@
 const OpenAI = require('openai');
 const { COACH_SYSTEM_PROMPT } = require('./coachPrompt');
 const { formatContextForPrompt } = require('./coachContext');
+const { formatMemoriesForPrompt } = require('./coachMemory');
 
 let openaiClient = null;
 
@@ -57,8 +58,14 @@ function buildOpenAIMessages(messages, latestUserText) {
 /**
  * Calls OpenAI for a coach reply. Throws if the API fails or key is missing.
  * @param {object|null} personalizationContext - already sanitized opt-in context
+ * @param {Array<{text: string}>|null} savedMemories - sanitized user-approved notes
  */
-async function generateOpenAIReply(messages, latestUserText, personalizationContext = null) {
+async function generateOpenAIReply(
+  messages,
+  latestUserText,
+  personalizationContext = null,
+  savedMemories = null
+) {
   const openai = getOpenAIClient();
 
   if (!openai) {
@@ -78,6 +85,11 @@ async function generateOpenAIReply(messages, latestUserText, personalizationCont
   const contextBlock = formatContextForPrompt(personalizationContext);
   if (contextBlock) {
     openaiMessages.push({ role: 'system', content: contextBlock });
+  }
+
+  const memoryBlock = formatMemoriesForPrompt(savedMemories);
+  if (memoryBlock) {
+    openaiMessages.push({ role: 'system', content: memoryBlock });
   }
 
   openaiMessages.push(...sanitized);

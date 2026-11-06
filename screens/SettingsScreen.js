@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import GhostSafeArea from '../components/GhostSafeArea';
 import { useNavigation, CommonActions, useFocusEffect } from '@react-navigation/native';
@@ -22,6 +23,12 @@ import {
   clearAllAppData,
   loadCoachContextShareEnabled,
   saveCoachContextShareEnabled,
+  loadCoachMemoryEnabled,
+  saveCoachMemoryEnabled,
+  loadCoachMemories,
+  addCoachMemory,
+  deleteCoachMemory,
+  clearCoachMemories,
 } from '../utils/storage';
 import { useStreak } from '../context/StreakContext';
 import { usePremium } from '../context/PremiumContext';
@@ -73,20 +80,27 @@ export default function SettingsScreen() {
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [notificationTime, setNotificationTime] = useState('9:00 PM');
   const [coachContextShare, setCoachContextShare] = useState(false);
+  const [coachMemoryEnabled, setCoachMemoryEnabled] = useState(false);
+  const [coachMemories, setCoachMemories] = useState([]);
+  const [memoryDraft, setMemoryDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [presetIndex, setPresetIndex] = useState(2);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
 
   const loadAll = useCallback(async () => {
-    const [start, reminder, shareContext] = await Promise.all([
+    const [start, reminder, shareContext, memoryEnabled, memories] = await Promise.all([
       loadNoContactStart(),
       loadReminderSettings(),
       loadCoachContextShareEnabled(),
+      loadCoachMemoryEnabled(),
+      loadCoachMemories(),
     ]);
     if (start) setStartDateIso(start);
     setReminderEnabled(isPremium ? reminder.enabled : false);
     setNotificationTime(reminder.time);
     setCoachContextShare(Boolean(shareContext));
+    setCoachMemoryEnabled(Boolean(memoryEnabled));
+    setCoachMemories(memories);
     setLoading(false);
   }, [isPremium]);
 
@@ -146,6 +160,46 @@ export default function SettingsScreen() {
   const toggleCoachContextShare = async (value) => {
     setCoachContextShare(value);
     await saveCoachContextShareEnabled(value);
+  };
+
+  const toggleCoachMemory = async (value) => {
+    setCoachMemoryEnabled(value);
+    await saveCoachMemoryEnabled(value);
+  };
+
+  const saveMemoryDraft = async () => {
+    dismissKeyboard();
+    const result = await addCoachMemory(memoryDraft);
+    if (!result.ok) {
+      Alert.alert('Could not save memory', result.message);
+      if (result.memories) setCoachMemories(result.memories);
+      return;
+    }
+    setMemoryDraft('');
+    setCoachMemories(result.memories);
+  };
+
+  const removeMemory = async (id) => {
+    const memories = await deleteCoachMemory(id);
+    setCoachMemories(memories);
+  };
+
+  const confirmDeleteAllMemories = () => {
+    Alert.alert(
+      'Delete all memories?',
+      'This removes saved coach preferences from this device. Your chat stays.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await clearCoachMemories();
+            setCoachMemories([]);
+          },
+        },
+      ]
+    );
   };
 
   const toggleReminder = async (value) => {
@@ -238,7 +292,7 @@ export default function SettingsScreen() {
   const deleteAccount = () => {
     Alert.alert(
       'Delete all local data?',
-      'This removes your account, journal entries, moods, streak date, and reminder settings from this device.',
+      'This removes your account, journal entries, moods, streak date, reminder settings, coach chat, and saved coach memories from this device.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -432,6 +486,79 @@ export default function SettingsScreen() {
             never your journal, email, or password.
           </Text>
           <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.rowLabelWrap}>
+              <Text style={styles.rowLabel}>Use saved memories in AI Coach</Text>
+            </View>
+            <Switch
+              value={coachMemoryEnabled}
+              onValueChange={toggleCoachMemory}
+              trackColor={{
+                false: 'rgba(255,255,255,0.15)',
+                true: 'rgba(124, 58, 237, 0.5)',
+              }}
+              thumbColor={coachMemoryEnabled ? '#a78bfa' : '#f4f4f5'}
+              ios_backgroundColor="rgba(255,255,255,0.15)"
+            />
+          </View>
+          <Text style={styles.rowHint}>
+            Off by default. When on, only short preferences you save here are
+            sent with a coach message. Clearing chat does not delete them.
+          </Text>
+          <View style={styles.memoryComposer}>
+            <TextInput
+              value={memoryDraft}
+              onChangeText={setMemoryDraft}
+              placeholder="Remember that…"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              style={styles.memoryInput}
+              maxLength={120}
+              returnKeyType="done"
+              onSubmitEditing={saveMemoryDraft}
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.memorySave,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={saveMemoryDraft}
+              accessibilityRole="button"
+              accessibilityLabel="Save memory"
+            >
+              <Text style={styles.memorySaveText}>Save</Text>
+            </Pressable>
+          </View>
+          {coachMemories.length === 0 ? (
+            <Text style={styles.memoryEmpty}>No saved memories yet.</Text>
+          ) : (
+            coachMemories.map((memory) => (
+              <View key={memory.id} style={styles.memoryRow}>
+                <Text style={styles.memoryText}>{memory.text}</Text>
+                <Pressable
+                  onPress={() => removeMemory(memory.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete memory ${memory.text}`}
+                  hitSlop={8}
+                >
+                  <Text style={styles.memoryDeleteText}>Delete</Text>
+                </Pressable>
+              </View>
+            ))
+          )}
+          {coachMemories.length > 0 ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.memoryDeleteAll,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={confirmDeleteAllMemories}
+              accessibilityRole="button"
+              accessibilityLabel="Delete all memories"
+            >
+              <Text style={styles.memoryDeleteText}>Delete all memories</Text>
+            </Pressable>
+          ) : null}
+          <View style={styles.divider} />
           <SettingsRow label="Privacy Policy" onPress={openPrivacy} />
           <View style={styles.divider} />
           <SettingsRow label="Safety Disclaimer" onPress={openSafetyDisclaimer} />
@@ -585,6 +712,65 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingBottom: 12,
     marginTop: -8,
+  },
+  memoryComposer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+  },
+  memoryInput: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: 'rgba(255, 255, 255, 0.92)',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    fontSize: 15,
+  },
+  memorySave: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(124, 58, 237, 0.35)',
+  },
+  memorySaveText: {
+    color: '#e9d5ff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  memoryEmpty: {
+    color: 'rgba(255, 255, 255, 0.4)',
+    fontSize: 13,
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+  },
+  memoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+  },
+  memoryText: {
+    flex: 1,
+    color: 'rgba(255, 255, 255, 0.86)',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  memoryDeleteText: {
+    color: '#fca5a5',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  memoryDeleteAll: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 18,
+    paddingBottom: 16,
   },
   freePeriodText: {
     color: 'rgba(255, 255, 255, 0.78)',
