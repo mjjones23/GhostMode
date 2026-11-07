@@ -89,7 +89,7 @@ async function handleCoachChat(req, res) {
 
     res.json({ reply, crisis: false });
   } catch (error) {
-    console.error('Coach API error:', error.message);
+    console.error('[AI Coach] request failed');
     res.status(500).json({
       error: 'Could not get a response from AI Coach. Try again in a moment.',
     });

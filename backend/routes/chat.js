@@ -16,8 +16,16 @@ function crisisResponse() {
   };
 }
 
-function mockResponse(userText, reason) {
-  console.log('[AI Coach] mock fallback used: yes —', reason);
+function failureCategory(error) {
+  const status = Number(error?.status);
+  if (Number.isInteger(status) && status >= 100 && status <= 599) {
+    return `status ${status}`;
+  }
+  return 'provider error';
+}
+
+function mockResponse(userText, category) {
+  console.log('[AI Coach] mock fallback used: yes —', category);
 
   return {
     reply: getMockReply(userText),
@@ -48,19 +56,22 @@ router.post('/chat', async (req, res) => {
 
     const userText = String(userMessageField || lastUser.content).trim();
     const personalizationContext = sanitizeCoachContext(rawContext);
+    const crisis = detectCrisis(userText);
 
-    console.log('[AI Coach] message received by backend:', userText);
-    console.log(
-      '[AI Coach] personalization context:',
-      personalizationContext ? 'present (sanitized)' : 'none'
-    );
+    // Length and flags only. Never log message text, memories, or context values.
+    console.log('[AI Coach] message received:', {
+      chars: userText.length,
+      messageCount: messages.length,
+      crisis,
+      context: personalizationContext ? 'present' : 'none',
+    });
 
     if (!userText) {
       return res.status(400).json({ error: 'user message is required' });
     }
 
     // Crisis always wins — context and saved memories are not sent to the model.
-    if (detectCrisis(userText)) {
+    if (crisis) {
       console.log('[AI Coach] saved memories: ignored for crisis');
       return res.json(crisisResponse());
     }
@@ -102,16 +113,13 @@ router.post('/chat', async (req, res) => {
         });
       } catch (error) {
         console.log('[AI Coach] OpenAI called: yes (failed)');
-        console.error('[AI Coach] OpenAI error:', error.message);
-        return res.json(mockResponse(userText, error.message));
+        return res.json(mockResponse(userText, failureCategory(error)));
       }
     }
 
     console.log('[AI Coach] OpenAI called: no (key missing)');
-    return res.json(mockResponse(userText, 'OPENAI_API_KEY not configured'));
-  } catch (error) {
-    console.error('POST /chat error:', error.message);
-
+    return res.json(mockResponse(userText, 'openai not configured'));
+  } catch {
     try {
       const lastUser = [...(req.body?.messages || [])]
         .reverse()
@@ -119,7 +127,7 @@ router.post('/chat', async (req, res) => {
       const userText = String(req.body?.userMessage || lastUser?.content || '').trim();
 
       console.log('[AI Coach] OpenAI called: no (handler error)');
-      return res.json(mockResponse(userText, error.message));
+      return res.json(mockResponse(userText, 'handler error'));
     } catch {
       return res.status(500).json({
         error: 'Could not generate a coach reply. Try again in a moment.',

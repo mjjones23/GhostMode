@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import GhostSafeArea from '../components/GhostSafeArea';
 import { useNavigation } from '@react-navigation/native';
 import AuthTextField from '../components/AuthTextField';
@@ -23,12 +24,19 @@ export default function SignUpScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [ageError, setAgeError] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const handleSignUp = async () => {
     if (busy) return;
 
     dismissKeyboard();
+    if (!ageConfirmed) {
+      setAgeError(true);
+      return;
+    }
+    setAgeError(false);
     setBusy(true);
     try {
       const result = await signup({ name, email, password });
@@ -61,7 +69,7 @@ export default function SignUpScreen() {
 
           <Text style={styles.title}>Create account</Text>
           <Text style={styles.subtitle}>
-            Start your private space for healing. Your account is saved securely on this device.
+            Start your private space for healing. Your account information is stored on this device.
           </Text>
 
           <AuthTextField
@@ -91,6 +99,31 @@ export default function SignUpScreen() {
             returnKeyType="done"
             onSubmitEditing={handleSignUp}
           />
+
+          <Pressable
+            style={({ pressed }) => [styles.ageRow, pressed && styles.buttonPressed]}
+            onPress={() => {
+              setAgeConfirmed((checked) => !checked);
+              setAgeError(false);
+            }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: ageConfirmed }}
+            accessibilityLabel="I confirm that I am 13 years of age or older."
+          >
+            <View style={[styles.checkbox, ageConfirmed && styles.checkboxChecked]}>
+              {ageConfirmed ? (
+                <Ionicons name="checkmark" size={16} color="#ffffff" />
+              ) : null}
+            </View>
+            <Text style={styles.ageLabel}>
+              I confirm that I am 13 years of age or older.
+            </Text>
+          </Pressable>
+          {ageError ? (
+            <Text style={styles.ageError} accessibilityRole="alert">
+              Please confirm that you are 13 years of age or older.
+            </Text>
+          ) : null}
 
           <Pressable
             style={({ pressed }) => [
@@ -212,6 +245,43 @@ const styles = StyleSheet.create({
   linkAccent: {
     color: '#c4b5fd',
     fontWeight: '700',
+  },
+  ageRow: {
+    width: '100%',
+    maxWidth: 340,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  checkbox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(196, 181, 253, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    marginTop: 1,
+  },
+  checkboxChecked: {
+    backgroundColor: '#7c3aed',
+    borderColor: '#a78bfa',
+  },
+  ageLabel: {
+    flex: 1,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  ageError: {
+    width: '100%',
+    maxWidth: 340,
+    color: '#fca5a5',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
   },
   disclaimer: {
     marginTop: 24,

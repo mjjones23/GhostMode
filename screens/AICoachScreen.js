@@ -409,8 +409,6 @@ export default function AICoachScreen() {
     const trimmed = text.trim();
     if (!trimmed || isTyping) return;
 
-    console.log('[AI Coach] user message received by app:', trimmed);
-
     dismissKeyboard();
     inputRef.current?.blur();
 

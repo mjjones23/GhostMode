@@ -63,9 +63,10 @@ async function postChat(
     requestBody.memories = savedMemories;
   }
 
-  // Counts and allowlisted context keys only — never memory text or chat content.
+  // Counts, key names, and lengths only — never message, memory, or journal text.
   console.log('[AI Coach] request sent to backend:', {
     messageCount: messages.length,
+    latestUserChars: String(userMessage || '').length,
     hasContext: Boolean(personalizationContext),
     contextKeys: personalizationContext ? Object.keys(personalizationContext) : [],
     memoryCount: savedMemories?.length || 0,
@@ -199,7 +200,13 @@ export async function fetchCoachReply({
     };
   }
 
-  if (detectCrisis(trimmed)) {
+  const crisis = detectCrisis(trimmed);
+  console.log('[AI Coach] reply requested:', {
+    chars: trimmed.length,
+    crisis,
+  });
+
+  if (crisis) {
     return {
       reply: CRISIS_REPLY,
       crisis: true,

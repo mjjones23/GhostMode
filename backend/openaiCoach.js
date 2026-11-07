@@ -94,10 +94,13 @@ async function generateOpenAIReply(
 
   openaiMessages.push(...sanitized);
 
-  console.log(
-    '[AI Coach] message sent to OpenAI (latest user turn):',
-    sanitized[sanitized.length - 1]?.content
-  );
+  const latest = sanitized[sanitized.length - 1];
+  console.log('[AI Coach] OpenAI request:', {
+    messageCount: sanitized.length,
+    latestUserChars: latest?.role === 'user' ? latest.content.length : 0,
+    hasContext: Boolean(contextBlock),
+    hasMemories: Boolean(memoryBlock),
+  });
 
   const completion = await openai.chat.completions.create({
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',

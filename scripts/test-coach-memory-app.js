@@ -217,6 +217,30 @@ async function main() {
   check('crisis reply is the safety copy', crisis.reply === CRISIS_REPLY);
   check('crisis does not use memories', crisis.memoriesUsed === false);
   check('crisis does not call the backend', fetchCalls === 0);
+  check(
+    'crisis logs omit the message',
+    logs.every((line) => !line.includes('I want to kill myself'))
+  );
+
+  logs.length = 0;
+  const privateText = 'qx91-private-note';
+  const privateCrisis = await fetchCoachReply({
+    userText: `I want to kill myself ${privateText}`,
+    chatHistory: [
+      { id: 'c2', sender: 'user', text: `I want to kill myself ${privateText}` },
+    ],
+    personalizationContext: { journal: privateText, streakDay: 3 },
+    savedMemories: [{ text: privateText }],
+  });
+  check('marked crisis stays local', privateCrisis.crisis === true && fetchCalls === 0);
+  check(
+    'marked crisis logs omit private text',
+    logs.every((line) => !line.includes(privateText))
+  );
+  check(
+    'marked crisis log keeps the length',
+    logs.some((line) => line.includes('"chars":') && line.includes('"crisis":true'))
+  );
 
   logs.length = 0;
   const reply = await fetchCoachReply({
@@ -246,6 +270,45 @@ async function main() {
     savedMemories: null,
   });
   check('disabled memories are omitted from the request', requestBody.memories === undefined);
+
+  logs.length = 0;
+  requestBody = null;
+  const marked = 'qx91-private-note';
+  global.fetch = async () => {
+    throw new Error(`${marked} raw provider failure`);
+  };
+  const failedReply = await fetchCoachReply({
+    userText: `I miss them ${marked}`,
+    chatHistory: [
+      { id: 'e1', sender: 'ai', text: `earlier ${marked}` },
+      { id: 'e2', sender: 'user', text: `I miss them ${marked}` },
+    ],
+    personalizationContext: {
+      journal: marked,
+      streakDay: 4,
+      recoveryGoal: 'Heal and move on',
+    },
+    savedMemories: [{ text: marked }],
+  });
+  check('network failure still returns a reply', typeof failedReply.reply === 'string');
+  check(
+    'network-failure logs omit private text',
+    logs.every((line) => !line.includes(marked))
+  );
+  check(
+    'network-failure log keeps length and context keys',
+    logs.some((line) => line.includes('"latestUserChars":') && line.includes('streakDay')) &&
+      logs.every((line) => !line.includes('"journal"'))
+  );
+
+  const screenSrc = fs.readFileSync(
+    path.join(ROOT, 'screens', 'AICoachScreen.js'),
+    'utf8'
+  );
+  check(
+    'coach screen does not log the typed message',
+    !screenSrc.includes('user message received by app')
+  );
 
   global.fetch = originalFetch;
   console.log = originalLog;

@@ -12,13 +12,6 @@ import {
   pickQuoteIndexForDate,
   pickNewQuoteIndex,
 } from '../content/recoveryQuotes';
-import {
-  APP_REVIEW_DISPLAY_NAME,
-  APP_REVIEW_PASSWORD,
-  APP_REVIEW_PREMIUM_EMAIL,
-  isAppReviewCredentials,
-  isAppReviewPremiumEmail,
-} from '../config/appReview';
 import { getStreakDayFromDateKeys, toDateKey } from './dateMath';
 import {
   COACH_MEMORY_MAX_ITEMS,
@@ -702,12 +695,65 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function emailsMatch(storedEmail, enteredEmail) {
+  return normalizeEmail(storedEmail) === normalizeEmail(enteredEmail);
+}
+
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function hasLegacyPasswordField(profile) {
+  return Object.prototype.hasOwnProperty.call(profile, 'password');
+}
+
+function storedPasswordHash(profile) {
+  return typeof profile?.passwordHash === 'string' && profile.passwordHash.length > 0
+    ? profile.passwordHash
+    : null;
+}
+
+/**
+ * Builds a replacement profile with no plaintext password.
+ * Returns null when the stored profile should be left unchanged.
+ * An existing passwordHash is kept as-is. Plaintext is hashed only when
+ * no hash is stored. The caller must persist this before discarding the original.
+ */
+async function buildMigratedProfile(profile) {
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return null;
+  if (!hasLegacyPasswordField(profile)) return null;
+
+  const existingHash = storedPasswordHash(profile);
+  const plaintext = typeof profile.password === 'string' ? profile.password.trim() : '';
+  if (!existingHash && !plaintext) return null;
+
+  const { password: _legacyPassword, ...rest } = profile;
+  if (existingHash) {
+    return { ...rest, passwordHash: existingHash };
+  }
+
+  const passwordHash = await hashLocalPassword(plaintext, profile.email);
+  return { ...rest, passwordHash };
+}
+
 export async function loadUserProfile() {
-  return readJson(STORAGE_KEYS.USER_PROFILE, null);
+  const profile = await readJson(STORAGE_KEYS.USER_PROFILE, null);
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return profile;
+
+  let migrated = null;
+  try {
+    migrated = await buildMigratedProfile(profile);
+  } catch {
+    return profile;
+  }
+  if (!migrated) return profile;
+
+  try {
+    await saveUserProfile(migrated);
+  } catch {
+    return profile;
+  }
+  return migrated;
 }
 
 async function saveUserProfile(profile) {
@@ -749,22 +795,25 @@ async function hashLocalPassword(password, email) {
 async function verifyLocalPassword(profile, password) {
   const trimmedPassword = String(password || '');
 
-  if (profile.passwordHash) {
+  if (storedPasswordHash(profile)) {
     const hash = await hashLocalPassword(trimmedPassword, profile.email);
     return hash === profile.passwordHash;
   }
 
-  if (profile.password) {
-    if (profile.password !== trimmedPassword) {
-      return false;
-    }
+  const storedPassword = typeof profile.password === 'string' ? profile.password.trim() : '';
+  if (!storedPassword || storedPassword !== trimmedPassword) {
+    return false;
+  }
+
+  // Login still succeeds if persisting the hash fails. The original record stays.
+  try {
     const passwordHash = await hashLocalPassword(trimmedPassword, profile.email);
     const { password: _legacyPassword, ...rest } = profile;
     await saveUserProfile({ ...rest, passwordHash });
-    return true;
+  } catch {
+    // The next profile load retries the migration.
   }
-
-  return false;
+  return true;
 }
 
 export async function registerLocalUser({ name, email, password }) {
@@ -780,18 +829,6 @@ export async function registerLocalUser({ name, email, password }) {
   }
   if (trimmedPassword.length < 6) {
     return { ok: false, message: 'Password must be at least 6 characters.' };
-  }
-
-  // Apple App Review account — always recreate/login with the dedicated credentials.
-  if (isAppReviewCredentials(normalizedEmail, trimmedPassword)) {
-    return ensureAppReviewLocalAccount();
-  }
-
-  if (isAppReviewPremiumEmail(normalizedEmail)) {
-    return {
-      ok: false,
-      message: 'Incorrect password for the App Review account.',
-    };
   }
 
   const existing = await loadUserProfile();
@@ -821,50 +858,12 @@ export async function registerLocalUser({ name, email, password }) {
   };
 }
 
-/**
- * Upserts the Apple App Review local profile and signs it in.
- * Works on a fresh TestFlight install (no prior signup required).
- */
-async function ensureAppReviewLocalAccount() {
-  const passwordHash = await hashLocalPassword(
-    APP_REVIEW_PASSWORD,
-    APP_REVIEW_PREMIUM_EMAIL
-  );
-
-  const existing = await loadUserProfile();
-  const profile = {
-    name: APP_REVIEW_DISPLAY_NAME,
-    email: APP_REVIEW_PREMIUM_EMAIL,
-    passwordHash,
-    createdAt: existing?.createdAt || new Date().toISOString(),
-    // Marks this profile as the App Review demo account.
-    isAppReviewAccount: true,
-  };
-
-  await saveUserProfile(profile);
-  await setAuthSession(true);
-
-  return {
-    ok: true,
-    user: { name: profile.name, email: profile.email },
-  };
-}
-
 export async function loginLocalUser({ email, password }) {
   const normalizedEmail = normalizeEmail(email);
   const trimmedPassword = String(password || '');
 
   if (!normalizedEmail || !trimmedPassword) {
     return { ok: false, message: 'Please enter your email and password.' };
-  }
-
-  // Apple App Review — create/sign in without requiring a prior local signup.
-  if (isAppReviewCredentials(normalizedEmail, trimmedPassword)) {
-    return ensureAppReviewLocalAccount();
-  }
-
-  if (isAppReviewPremiumEmail(normalizedEmail)) {
-    return { ok: false, message: 'Incorrect email or password.' };
   }
 
   const profile = await loadUserProfile();
@@ -876,7 +875,7 @@ export async function loginLocalUser({ email, password }) {
   }
 
   const passwordOk = await verifyLocalPassword(profile, trimmedPassword);
-  if (profile.email !== normalizedEmail || !passwordOk) {
+  if (!emailsMatch(profile.email, normalizedEmail) || !passwordOk) {
     return { ok: false, message: 'Incorrect email or password.' };
   }
 
