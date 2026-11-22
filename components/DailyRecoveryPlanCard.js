@@ -160,6 +160,9 @@ export default function DailyRecoveryPlanCard({ refreshKey, onOpenActivity, onPl
           {plan.mood && (
             <Text style={styles.tailored}>Tailored to how you're feeling today.</Text>
           )}
+          <Text style={styles.disclaimer}>
+            Supportive daily goals — not medical advice or treatment.
+          </Text>
 
           <View style={styles.progressRow}>
             <Text style={styles.progressText}>
@@ -261,6 +264,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     lineHeight: 21,
+  },
+  disclaimer: {
+    color: 'rgba(255,255,255,0.38)',
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: 12,
   },
   tailored: {
     color: 'rgba(196, 181, 253, 0.75)',

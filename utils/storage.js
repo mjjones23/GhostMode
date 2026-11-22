@@ -300,6 +300,12 @@ export async function deleteMoodLog(id) {
   return updated;
 }
 
+/** Deletes all mood logs and daily mood check-ins from this device. */
+export async function clearMoodLogs() {
+  await AsyncStorage.removeItem(STORAGE_KEYS.MOODS);
+  return [];
+}
+
 // ——— Daily check-ins (one mood per calendar day) ———
 
 function normalizeDailyCheckIn(entry) {
@@ -1027,6 +1033,34 @@ export async function deleteCoachMemory(id) {
   );
   await writeJson(STORAGE_KEYS.COACH_MEMORIES, memories);
   return memories;
+}
+
+export async function updateCoachMemory(id, rawText) {
+  const reason = rejectionReasonForMemoryText(rawText);
+  if (reason) return { ok: false, message: reason };
+
+  const text = sanitizeCoachMemoryText(rawText);
+  const existing = await loadCoachMemories();
+  const index = existing.findIndex((memory) => memory.id === String(id));
+  if (index === -1) {
+    return { ok: false, message: 'That memory was not found.', memories: existing };
+  }
+
+  const duplicate = existing.some(
+    (memory, i) =>
+      i !== index && memory.text.toLowerCase() === text.toLowerCase()
+  );
+  if (duplicate) {
+    return { ok: false, message: 'That memory is already saved.', memories: existing };
+  }
+
+  const memories = existing.map((memory, i) =>
+    i === index
+      ? { ...memory, text, updatedAt: new Date().toISOString() }
+      : memory
+  );
+  await writeJson(STORAGE_KEYS.COACH_MEMORIES, memories);
+  return { ok: true, memories };
 }
 
 export async function clearCoachMemories() {

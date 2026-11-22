@@ -33,6 +33,10 @@ import {
   fetchCoachReply,
 } from '../services/aiService';
 import { loadCoachPersonalizationContext } from '../utils/coachContext';
+import { useAuth } from '../context/AuthContext';
+import { usePremium } from '../context/PremiumContext';
+import { clientShouldEnforceQuota } from '../utils/aiQuota';
+import AiLimitCard from '../components/AiLimitCard';
 
 const INITIAL_MESSAGES = [
   {
@@ -264,6 +268,8 @@ async function waitForRealisticReplyDelay(startedAt) {
 
 export default function AICoachScreen() {
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const { isPremium } = usePremium();
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -272,6 +278,7 @@ export default function AICoachScreen() {
   const [backendError, setBackendError] = useState(null);
   const [lastReplyMode, setLastReplyMode] = useState(null);
   const [chatHydrated, setChatHydrated] = useState(false);
+  const [quotaExceeded, setQuotaExceeded] = useState(null);
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const skipAnimateIds = useRef(new Set(INITIAL_MESSAGES.map((msg) => msg.id)));
@@ -367,12 +374,24 @@ export default function AICoachScreen() {
         loadCoachPersonalizationContext(),
         loadCoachMemoriesForApi(),
       ]);
+      const enforceQuota = clientShouldEnforceQuota(isPremium);
       const result = await fetchCoachReply({
         userText,
         chatHistory,
         personalizationContext,
         savedMemories,
+        accountId: user?.uid || null,
+        enforceQuota,
       });
+
+      if (result.quotaExceeded) {
+        setQuotaExceeded(result.quotaExceeded);
+        setLastReplyMode('quota');
+        await waitForRealisticReplyDelay(started);
+        return;
+      }
+
+      setQuotaExceeded(null);
       setLastReplyMode(result.mode || 'mock');
       await waitForRealisticReplyDelay(started);
 
@@ -492,6 +511,14 @@ export default function AICoachScreen() {
           lastReplyMode={lastReplyMode}
           errorHint={backendError}
         />
+
+        {quotaExceeded ? (
+          <AiLimitCard
+            quota={quotaExceeded}
+            onUpgrade={() => navigation.navigate('Paywall')}
+            onDismiss={() => setQuotaExceeded(null)}
+          />
+        ) : null}
 
         <View style={styles.messagesWrap}>
           <ScrollView

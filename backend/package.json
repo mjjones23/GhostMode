@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test:coach-context": "node test-coach-context.js"
+    "test:coach-context": "node test-coach-context.js",
+    "test:quota": "node test-quota.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -3,6 +3,7 @@ import { getMockReply } from '../utils/mockCoach';
 import { getCoachApiUrl, isCoachApiConfigured } from '../config/api';
 import { sanitizeCoachContextPayload } from '../utils/coachContext';
 import { sanitizeCoachMemoryList } from '../utils/coachMemory';
+import { parseQuotaExceededResponse } from '../utils/aiQuota';
 
 const REQUEST_TIMEOUT_MS = 12000;
 const HEALTH_TIMEOUT_MS = 5000;
@@ -43,7 +44,8 @@ async function postChat(
   messages,
   userMessage,
   personalizationContext = null,
-  savedMemories = null
+  savedMemories = null,
+  quotaOptions = null
 ) {
   const baseUrl = getCoachApiUrl();
   if (!baseUrl) {
@@ -62,6 +64,12 @@ async function postChat(
   if (savedMemories?.length) {
     requestBody.memories = savedMemories;
   }
+  if (quotaOptions?.enforceQuota) {
+    requestBody.enforceQuota = true;
+    if (quotaOptions.accountId) {
+      requestBody.accountId = quotaOptions.accountId;
+    }
+  }
 
   // Counts, key names, and lengths only — never message, memory, or journal text.
   console.log('[AI Coach] request sent to backend:', {
@@ -70,15 +78,20 @@ async function postChat(
     hasContext: Boolean(personalizationContext),
     contextKeys: personalizationContext ? Object.keys(personalizationContext) : [],
     memoryCount: savedMemories?.length || 0,
+    enforceQuota: Boolean(quotaOptions?.enforceQuota),
   });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const headers = { 'Content-Type': 'application/json' };
+  if (quotaOptions?.proBypassSecret) {
+    headers['X-Ghost-Pro-Bypass'] = quotaOptions.proBypassSecret;
+  }
 
   try {
     const response = await fetch(`${baseUrl}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
@@ -143,6 +156,7 @@ export async function checkBackendStatus() {
       connected,
       mode: connected ? data.mode || 'mock' : 'offline',
       openaiConfigured: Boolean(data.openaiConfigured),
+      quotaEnforcement: Boolean(data.quotaEnforcement),
       error: connected ? null : OFFLINE_USER_MESSAGE,
     };
   } catch (error) {
@@ -155,6 +169,32 @@ export async function checkBackendStatus() {
         ? 'Ghost Mode AI health check timed out.'
         : OFFLINE_USER_MESSAGE,
     };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function fetchAiQuotaStatus(accountId) {
+  if (!isCoachApiConfigured() || !accountId) {
+    return { ok: false, error: NOT_CONFIGURED_MESSAGE };
+  }
+
+  const baseUrl = getCoachApiUrl();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(
+      `${baseUrl}/quota?accountId=${encodeURIComponent(accountId)}`,
+      { signal: controller.signal }
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, error: data.error || OFFLINE_USER_MESSAGE };
+    }
+    return { ok: true, ...data };
+  } catch {
+    return { ok: false, error: OFFLINE_USER_MESSAGE };
   } finally {
     clearTimeout(timeoutId);
   }
@@ -182,6 +222,9 @@ export async function fetchCoachReply({
   chatHistory = [],
   personalizationContext = null,
   savedMemories = null,
+  accountId = null,
+  enforceQuota = false,
+  proBypassSecret = null,
 } = {}) {
   const trimmedFromArg = String(userText || '').trim();
   const trimmedFromHistory = getLatestUserText(chatHistory);
@@ -233,12 +276,30 @@ export async function fetchCoachReply({
   const memoriesForRequest = safeMemories.length ? safeMemories : null;
 
   try {
-    const { ok, data, error } = await postChat(
+    const { ok, status, data, error } = await postChat(
       messages,
       trimmed,
       safeContext,
-      memoriesForRequest
+      memoriesForRequest,
+      {
+        enforceQuota,
+        accountId,
+        proBypassSecret,
+      }
     );
+
+    const quotaBlocked = parseQuotaExceededResponse(data, status);
+    if (quotaBlocked) {
+      return {
+        reply: null,
+        crisis: false,
+        source: 'backend',
+        mode: 'quota',
+        contextUsed: false,
+        memoriesUsed: false,
+        quotaExceeded: quotaBlocked,
+      };
+    }
 
     if (ok && typeof data.reply === 'string' && data.reply.trim()) {
       return {
@@ -248,6 +309,7 @@ export async function fetchCoachReply({
         mode: data.mode || 'mock',
         contextUsed: Boolean(data.contextUsed) || Boolean(safeContext),
         memoriesUsed: Boolean(memoriesForRequest),
+        quota: data.quota || null,
       };
     }
 

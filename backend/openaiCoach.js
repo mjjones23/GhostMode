@@ -121,6 +121,7 @@ async function generateOpenAIReply(
 module.exports = {
   generateOpenAIReply,
   isOpenAIConfigured,
+  getOpenAIClient,
   sanitizeMessages,
   buildOpenAIMessages,
 };

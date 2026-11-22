@@ -26,11 +26,11 @@ import {
 import ScreenBackButton from '../components/ScreenBackButton';
 
 const FEATURES = [
-  'Unlimited AI Coach messages',
-  'Progress insights & streak analytics',
-  'Unlimited journal history',
-  'Unlimited mood history',
+  'Unlimited AI Coach messages (no free quota)',
+  'Progress insights & weekly reports',
+  'Unlimited journal & mood history',
   'Daily healing reminders',
+  'Priority access to Pro music & voice (coming soon)',
 ];
 
 export default function PaywallScreen() {

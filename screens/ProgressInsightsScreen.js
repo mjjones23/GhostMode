@@ -15,6 +15,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { formatJournalEntryDateTime } from '../utils/storage';
 import { getCheckInMoodMeta, getMoodDisplayLabel } from '../content/dailyCheckInContent';
 import { getProgressInsights } from '../utils/progressInsights';
+import { getWeeklyProgressReport } from '../utils/weeklyProgressReport';
 import { usePremiumGate } from '../hooks/usePremiumGate';
 import ScreenBackButton from '../components/ScreenBackButton';
 import ScreenLoader from '../components/ScreenLoader';
@@ -85,6 +86,7 @@ export default function ProgressInsightsScreen() {
   const { isPremium, openPaywall, premiumEnabled } = usePremiumGate();
   const [loading, setLoading] = useState(true);
   const [insights, setInsights] = useState(null);
+  const [weeklyReport, setWeeklyReport] = useState(null);
 
   useEffect(() => {
     if (premiumEnabled && !isPremium) {
@@ -101,9 +103,13 @@ export default function ProgressInsightsScreen() {
 
       (async () => {
         setLoading(true);
-        const data = await getProgressInsights();
+        const [data, weekly] = await Promise.all([
+          getProgressInsights(),
+          getWeeklyProgressReport(),
+        ]);
         if (active) {
           setInsights(data);
+          setWeeklyReport(weekly);
           setLoading(false);
         }
       })();
@@ -156,6 +162,36 @@ export default function ProgressInsightsScreen() {
               </View>
               <Text style={styles.insightText}>{insights.insight}</Text>
             </View>
+
+            {weeklyReport ? (
+              <View style={styles.weeklyCard}>
+                <View style={styles.insightHeader}>
+                  <Ionicons name="calendar-outline" size={18} color="#c4b5fd" />
+                  <Text style={styles.insightLabel}>Weekly progress report</Text>
+                </View>
+                <Text style={styles.weeklyRange}>
+                  {weeklyReport.weekStart} → {weeklyReport.weekEnd}
+                </Text>
+                <Text style={styles.weeklyHeadline}>
+                  {weeklyReport.insight.headline}
+                </Text>
+                <Text style={styles.insightText}>{weeklyReport.insight.body}</Text>
+                <View style={styles.weeklyStats}>
+                  <Text style={styles.weeklyStat}>
+                    {weeklyReport.checkInCount} check-ins
+                  </Text>
+                  <Text style={styles.weeklyStat}>
+                    {weeklyReport.planActivitiesCompleted} plan activities
+                  </Text>
+                  <Text style={styles.weeklyStat}>
+                    Day {weeklyReport.streakDay} streak
+                  </Text>
+                </View>
+                <Text style={styles.weeklyDisclaimer}>
+                  Supportive summary only — not medical or clinical advice.
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.statsGrid}>
               <StatCard
@@ -291,6 +327,48 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginVertical: 40,
+  },
+  weeklyCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.22)',
+    marginBottom: 20,
+  },
+  weeklyRange: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  weeklyHeadline: {
+    color: '#f5f3ff',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  weeklyStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 10,
+  },
+  weeklyStat: {
+    color: '#c4b5fd',
+    fontSize: 12,
+    fontWeight: '700',
+    backgroundColor: 'rgba(124, 58, 237, 0.18)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  weeklyDisclaimer: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
+    lineHeight: 16,
   },
   insightCard: {
     backgroundColor: 'rgba(124, 58, 237, 0.12)',

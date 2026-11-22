@@ -34,6 +34,10 @@ yarn-error.*
 .env
 .env*.local
 server/.env
+backend/.env
+
+# durable local quota store (mount Railway volume in production)
+backend/data/
 
 # typescript
 *.tsbuildinfo

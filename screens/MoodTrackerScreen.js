@@ -1,11 +1,11 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
   Pressable,
   TouchableOpacity,
-  
+  Alert,
   TextInput,
   Platform,
   ActivityIndicator,
@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   loadMoodLogs,
   saveMoodLogs,
+  clearMoodLogs,
   formatJournalEntryDateTime,
 } from '../utils/storage';
 import {
@@ -29,6 +30,7 @@ import {
   getHiddenHistoryCount,
   FREE_HISTORY_LIMIT,
 } from '../utils/premium';
+import { buildMoodTrend } from '../utils/moodTrends';
 import PremiumUpsellBanner from '../components/PremiumUpsellBanner';
 import EmptyState from '../components/EmptyState';
 import ScreenLoader from '../components/ScreenLoader';
@@ -120,6 +122,26 @@ export default function MoodTrackerScreen() {
   const hasMoods = savedMoods.length > 0;
   const visibleMoods = limitHistoryForFree(savedMoods, isPremium);
   const hiddenMoodCount = getHiddenHistoryCount(savedMoods, isPremium);
+  const trend = useMemo(() => buildMoodTrend(savedMoods, 7), [savedMoods]);
+
+  const confirmClearAllMoods = () => {
+    Alert.alert(
+      'Delete all mood data?',
+      'This permanently removes mood history and daily mood check-ins from this device. Journal entries and streaks are not affected.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete all',
+          style: 'destructive',
+          onPress: async () => {
+            await clearMoodLogs();
+            loadVersionRef.current += 1;
+            setSavedMoods([]);
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <GhostSafeArea style={styles.safe} tabBar>
@@ -133,7 +155,8 @@ export default function MoodTrackerScreen() {
 
           <Text style={styles.title}>How are you feeling?</Text>
           <Text style={styles.subtitle}>
-            Tap a mood, add a note if you want, then save. It stays on this device.
+            Optional daily check-in. Tap a mood, add a note if you want, then save.
+            Mood data stays on this device unless you delete it.
           </Text>
 
           <View style={styles.moodGrid}>
@@ -190,6 +213,64 @@ export default function MoodTrackerScreen() {
                 {saving ? 'Saving...' : 'Save Mood'}
               </Text>
             </Pressable>
+          </View>
+
+          <Text style={styles.sectionLabel}>7-day trend</Text>
+          <View style={styles.trendCard}>
+            {trend.hasData ? (
+              <>
+                <Text style={styles.trendSummary}>
+                  {trend.total} log{trend.total === 1 ? '' : 's'} across{' '}
+                  {trend.activeDays} day{trend.activeDays === 1 ? '' : 's'}
+                </Text>
+                <View style={styles.trendBars}>
+                  {trend.series.map((day) => {
+                    const height =
+                      trend.maxCount > 0
+                        ? Math.max(6, Math.round((day.count / trend.maxCount) * 48))
+                        : 6;
+                    return (
+                      <View key={day.date} style={styles.trendDay}>
+                        <View
+                          style={[
+                            styles.trendBar,
+                            { height },
+                            day.count > 0 && styles.trendBarActive,
+                          ]}
+                          accessibilityLabel={`${day.dayLabel}: ${day.count} mood logs`}
+                        />
+                        <Text style={styles.trendDayLabel}>{day.dayLabel}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </>
+            ) : (
+              <Text style={styles.trendEmpty}>
+                Check in a few days to see your mood trend here.
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.privacyCard}>
+            <Text style={styles.privacyTitle}>Privacy</Text>
+            <Text style={styles.privacyBody}>
+              Mood logs are stored only on this phone. Delete individual entries
+              below, or clear everything anytime.
+            </Text>
+            {hasMoods ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.clearAllButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={confirmClearAllMoods}
+                accessibilityRole="button"
+                accessibilityLabel="Delete all mood data"
+              >
+                <Text style={styles.clearAllText}>Delete all mood data</Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <Text style={styles.sectionLabel}>Mood history</Text>
@@ -411,6 +492,84 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
     marginBottom: 12,
+  },
+  trendCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: 'rgba(124, 58, 237, 0.12)',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.28)',
+    marginBottom: 20,
+  },
+  trendSummary: {
+    color: 'rgba(255,255,255,0.78)',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 14,
+    textAlign: 'center',
+  },
+  trendBars: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    minHeight: 64,
+  },
+  trendDay: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  trendBar: {
+    width: 14,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 6,
+  },
+  trendBarActive: {
+    backgroundColor: '#a78bfa',
+  },
+  trendDayLabel: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  trendEmpty: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  privacyCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 24,
+  },
+  privacyTitle: {
+    color: '#e9d5ff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  privacyBody: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 10,
+  },
+  clearAllButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+  },
+  clearAllText: {
+    color: '#fca5a5',
+    fontSize: 13,
+    fontWeight: '700',
   },
   freePlanHint: {
     width: '100%',

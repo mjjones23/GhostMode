@@ -15,6 +15,10 @@
     "test:coach-context": "node backend/test-coach-context.js && node scripts/test-coach-context-app.js",
     "test:coach-memory": "node backend/test-coach-memory.js && node scripts/test-coach-memory-app.js && node backend/test-coach-logs.js",
     "test:password-migration": "node scripts/test-password-migration.js",
+    "test:quota": "node backend/test-quota.js",
+    "test:weekly-report": "node scripts/test-weekly-report.js",
+    "test:batch1": "node backend/test-quota.js && node scripts/test-weekly-report.js && node scripts/test-batch1-memory-quota.js",
+    "test": "npm run check:imports && npm run test:coach-context && npm run test:coach-memory && npm run test:password-migration && npm run test:batch1",
     "build:ios": "eas build --platform ios --profile production --auto-submit",
     "build:ios:only": "eas build --platform ios --profile production",
     "submit:ios": "eas submit --platform ios --profile production --latest"

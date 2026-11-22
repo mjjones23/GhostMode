@@ -4,6 +4,7 @@ const { getMockReply } = require('../mockCoach');
 const { generateOpenAIReply, isOpenAIConfigured } = require('../openaiCoach');
 const { sanitizeCoachContext } = require('../coachContext');
 const { memoriesAllowedForPrompt } = require('../coachMemory');
+const { enforceAiQuota } = require('../quotaGuard');
 
 const router = express.Router();
 
@@ -42,6 +43,8 @@ router.post('/chat', async (req, res) => {
       userMessage: userMessageField,
       context: rawContext,
       memories: rawMemories,
+      accountId,
+      enforceQuota,
     } = req.body;
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -64,16 +67,26 @@ router.post('/chat', async (req, res) => {
       messageCount: messages.length,
       crisis,
       context: personalizationContext ? 'present' : 'none',
+      quotaRequested: Boolean(enforceQuota),
     });
 
     if (!userText) {
       return res.status(400).json({ error: 'user message is required' });
     }
 
-    // Crisis always wins — context and saved memories are not sent to the model.
+    // Crisis always wins — context, memories, and quota do not apply.
     if (crisis) {
       console.log('[AI Coach] saved memories: ignored for crisis');
       return res.json(crisisResponse());
+    }
+
+    const quota = await enforceAiQuota(req, res, {
+      accountId,
+      // Client opts in when free-period flags say enforcement is on.
+      skip: enforceQuota !== true,
+    });
+    if (!quota.allowed) {
+      return undefined;
     }
 
     const savedMemories = memoriesAllowedForPrompt(
@@ -110,6 +123,15 @@ router.post('/chat', async (req, res) => {
           source: 'backend',
           mode: 'openai',
           contextUsed: Boolean(personalizationContext),
+          quota: quota.status
+            ? {
+                remaining: quota.status.remaining,
+                limit: quota.status.limit,
+                resetsAt: quota.status.resetsAt,
+              }
+            : quota.pro
+              ? { unlimited: true }
+              : undefined,
         });
       } catch (error) {
         console.log('[AI Coach] OpenAI called: yes (failed)');

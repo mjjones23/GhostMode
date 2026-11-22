@@ -4,6 +4,8 @@ import {
   RECOVERY_STAGES,
 } from '../content/dailyRecoveryPlan';
 import { normalizeMoodId } from '../content/dailyCheckInContent';
+import { AI_DAILY_PLAN_ENABLED } from '../config/featureFlags';
+import { getCoachApiUrl, isCoachApiConfigured } from '../config/api';
 import {
   getOrInitNoContactStart,
   getStreakDay,
@@ -183,8 +185,72 @@ export function buildDailyPlan({ dateKey, streakDay, mood, goal, previousPlan })
     goal: goal || null,
     activityIds: picked.slice(0, size),
     completed: {},
+    source: 'catalog',
     createdAt: new Date().toISOString(),
   };
+}
+
+/** Stage-filtered catalog ids for optional AI ranking. */
+export function getCandidateActivityIdsForStage(stageId) {
+  return DAILY_PLAN_ACTIVITIES.filter((activity) =>
+    activity.stages.includes(stageId)
+  ).map((activity) => activity.id);
+}
+
+/**
+ * Optional backend ranking over catalog ids. Always falls back to local rules.
+ * Never invents activities outside the catalog.
+ */
+async function maybeRankPlanWithAi(fallbackPlan) {
+  if (!AI_DAILY_PLAN_ENABLED || !isCoachApiConfigured()) {
+    return fallbackPlan;
+  }
+
+  const candidateIds = getCandidateActivityIdsForStage(fallbackPlan.stage);
+  if (candidateIds.length < 3) return fallbackPlan;
+
+  const baseUrl = getCoachApiUrl();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+  try {
+    const response = await fetch(`${baseUrl}/daily-plan/rank`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        candidateIds,
+        context: {
+          streakDay: fallbackPlan.streakDay,
+          mood: fallbackPlan.mood,
+          goal: fallbackPlan.goal,
+          stage: fallbackPlan.stage,
+        },
+      }),
+      signal: controller.signal,
+    });
+
+    const data = await response.json().catch(() => ({}));
+    const ids = Array.isArray(data?.activityIds) ? data.activityIds : [];
+    const allowed = new Set(candidateIds);
+    const safeIds = ids
+      .map((id) => String(id || '').trim())
+      .filter((id) => allowed.has(id))
+      .slice(0, 5);
+
+    if (!data?.ok || safeIds.length < 3) {
+      return fallbackPlan;
+    }
+
+    return {
+      ...fallbackPlan,
+      activityIds: safeIds,
+      source: 'ai',
+    };
+  } catch {
+    return fallbackPlan;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function resolvePlan(plan) {
@@ -242,11 +308,12 @@ async function ensureTodaysPlan(plans) {
     }
   }
 
-  const plan = buildDailyPlan({
+  const fallback = buildDailyPlan({
     dateKey: today,
     ...context,
     previousPlan: plans[getDateKeyDaysAgo(1)] || null,
   });
+  const plan = await maybeRankPlanWithAi(fallback);
   return { plan, changed: true };
 }
 

@@ -63,7 +63,7 @@ export const PAYWALL_PLANS = [
     productId: PRODUCT_IDS.MONTHLY,
     revenueCatPackageType: 'MONTHLY',
     name: 'Monthly',
-    priceLabel: '$6.99/month',
+    priceLabel: '$4.99/month',
     detail: 'Cancel anytime',
     badge: null,
   },
@@ -73,7 +73,7 @@ export const PAYWALL_PLANS = [
     revenueCatPackageType: 'ANNUAL',
     name: 'Yearly',
     priceLabel: '$39.99/year',
-    detail: 'Save 52% vs monthly',
+    detail: 'Save ~33% vs monthly',
     badge: 'Best value',
   },
 ];

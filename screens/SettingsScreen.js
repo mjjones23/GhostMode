@@ -27,6 +27,7 @@ import {
   saveCoachMemoryEnabled,
   loadCoachMemories,
   addCoachMemory,
+  updateCoachMemory,
   deleteCoachMemory,
   clearCoachMemories,
 } from '../utils/storage';
@@ -83,6 +84,7 @@ export default function SettingsScreen() {
   const [coachMemoryEnabled, setCoachMemoryEnabled] = useState(false);
   const [coachMemories, setCoachMemories] = useState([]);
   const [memoryDraft, setMemoryDraft] = useState('');
+  const [editingMemoryId, setEditingMemoryId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [presetIndex, setPresetIndex] = useState(2);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
@@ -169,18 +171,38 @@ export default function SettingsScreen() {
 
   const saveMemoryDraft = async () => {
     dismissKeyboard();
-    const result = await addCoachMemory(memoryDraft);
+    const result = editingMemoryId
+      ? await updateCoachMemory(editingMemoryId, memoryDraft)
+      : await addCoachMemory(memoryDraft);
     if (!result.ok) {
-      Alert.alert('Could not save memory', result.message);
+      Alert.alert(
+        editingMemoryId ? 'Could not update memory' : 'Could not save memory',
+        result.message
+      );
       if (result.memories) setCoachMemories(result.memories);
       return;
     }
     setMemoryDraft('');
+    setEditingMemoryId(null);
     setCoachMemories(result.memories);
+  };
+
+  const beginEditMemory = (memory) => {
+    setEditingMemoryId(memory.id);
+    setMemoryDraft(memory.text);
+  };
+
+  const cancelEditMemory = () => {
+    setEditingMemoryId(null);
+    setMemoryDraft('');
   };
 
   const removeMemory = async (id) => {
     const memories = await deleteCoachMemory(id);
+    if (editingMemoryId === id) {
+      setEditingMemoryId(null);
+      setMemoryDraft('');
+    }
     setCoachMemories(memories);
   };
 
@@ -502,14 +524,18 @@ export default function SettingsScreen() {
             />
           </View>
           <Text style={styles.rowHint}>
-            Off by default. When on, only short preferences you save here are
-            sent with a coach message. Clearing chat does not delete them.
+            Off by default. Ghost Mode never auto-saves chat or journal text as
+            memories — only short preferences you add here. When this switch is
+            on, those preferences may be sent with a coach message. Clearing
+            chat does not delete them.
           </Text>
           <View style={styles.memoryComposer}>
             <TextInput
               value={memoryDraft}
               onChangeText={setMemoryDraft}
-              placeholder="Remember that…"
+              placeholder={
+                editingMemoryId ? 'Update this memory…' : 'Remember that…'
+              }
               placeholderTextColor="rgba(255,255,255,0.35)"
               style={styles.memoryInput}
               maxLength={120}
@@ -523,17 +549,37 @@ export default function SettingsScreen() {
               ]}
               onPress={saveMemoryDraft}
               accessibilityRole="button"
-              accessibilityLabel="Save memory"
+              accessibilityLabel={editingMemoryId ? 'Update memory' : 'Save memory'}
             >
-              <Text style={styles.memorySaveText}>Save</Text>
+              <Text style={styles.memorySaveText}>
+                {editingMemoryId ? 'Update' : 'Save'}
+              </Text>
             </Pressable>
           </View>
+          {editingMemoryId ? (
+            <Pressable
+              onPress={cancelEditMemory}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel memory edit"
+              style={styles.memoryDeleteAll}
+            >
+              <Text style={styles.memoryDeleteText}>Cancel edit</Text>
+            </Pressable>
+          ) : null}
           {coachMemories.length === 0 ? (
             <Text style={styles.memoryEmpty}>No saved memories yet.</Text>
           ) : (
             coachMemories.map((memory) => (
               <View key={memory.id} style={styles.memoryRow}>
                 <Text style={styles.memoryText}>{memory.text}</Text>
+                <Pressable
+                  onPress={() => beginEditMemory(memory)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit memory ${memory.text}`}
+                  hitSlop={8}
+                >
+                  <Text style={styles.memoryEditText}>Edit</Text>
+                </Pressable>
                 <Pressable
                   onPress={() => removeMemory(memory.id)}
                   accessibilityRole="button"
@@ -761,6 +807,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.86)',
     fontSize: 14,
     lineHeight: 20,
+  },
+  memoryEditText: {
+    color: '#c4b5fd',
+    fontSize: 13,
+    fontWeight: '700',
   },
   memoryDeleteText: {
     color: '#fca5a5',

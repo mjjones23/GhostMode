@@ -7,9 +7,29 @@ Small **Node.js + Express** API for the AI Coach. Your phone talks to **this ser
 | Endpoint | Purpose |
 |----------|---------|
 | `GET /health` | Check if the server is running (and if OpenAI is configured) |
-| `POST /chat` | Get a coach reply — **real OpenAI** when configured, **mock** as fallback |
+| `POST /chat` | Get a coach reply — **real OpenAI** when configured, **mock** as fallback. Optional `enforceQuota` + `accountId` for free AI limits. |
+| `GET /quota` | Remaining free AI messages for an `accountId` (rolling window) |
+| `POST /daily-plan/rank` | Optional AI ranking over catalog activity ids (client must fall back locally) |
 
-Crisis phrases (self-harm, suicide, etc.) always return the **988 safety message** — never AI coaching.
+Crisis phrases (self-harm, suicide, etc.) always return the **988 safety message** — never AI coaching. Crisis replies do not consume AI quota.
+
+### Free AI quota (Pro foundation)
+
+Server enforces a configurable free allowance (default **10 messages / 5 hours**) when the client sends `enforceQuota: true` with a durable `accountId`.
+
+```env
+QUOTA_ENFORCEMENT=true
+AI_FREE_MESSAGE_LIMIT=10
+AI_FREE_WINDOW_MS=18000000
+# Optional comma-separated Pro account ids for testing
+GHOST_PRO_ACCOUNT_IDS=
+# Optional developer bypass header value (X-Ghost-Pro-Bypass)
+PRO_BYPASS_SECRET=
+# Optional persistent directory (mount a Railway volume here)
+QUOTA_DATA_DIR=
+```
+
+Quota data is stored in `backend/data/ai-quotas.json` by default. Mount a volume on that path in Railway for durability across redeploys. **Do not deploy these Batch 1 changes to production without review.**
 
 ---
 
