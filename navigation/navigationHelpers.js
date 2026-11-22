@@ -15,6 +15,8 @@ export const ROOT_SCREENS = new Set([
   'CrisisLock',
   'SOSMode',
   'Paywall',
+  'MusicHub',
+  'VoiceCoach',
   'DailyReminder',
   'SafetyDisclaimer',
   'LegalDocument',

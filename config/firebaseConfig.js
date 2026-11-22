@@ -1,37 +1,27 @@
 /**
- * Firebase setup for Ghost Mode Authentication
+ * Firebase setup for Ghost Mode Authentication (Batch 2).
  *
- * ─── LATER: add your Firebase web app config ───
- * 1. Go to https://console.firebase.google.com
- * 2. Create a project (or open your existing Ghost Mode project)
- * 3. Add an app → choose Web (</>) or iOS/Android when you add native builds
- * 4. Copy the firebaseConfig object from the Firebase console
- * 5. Put each value in a root `.env` file (recommended):
+ * Cloud auth stays OFF until CLOUD_AUTH_ENABLED is true AND env config is filled.
+ * Firebase web API keys are public identifiers — still keep them in `.env`.
+ * Protect the project with Auth rules and App Check before production launch.
  *
- *      EXPO_PUBLIC_FIREBASE_API_KEY=AIza...
- *      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
- *      EXPO_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
- *      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
- *      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=123456789
- *      EXPO_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abc123
- *
- * 6. Install Firebase when ready:
- *      npx expo install firebase
- * 7. Set USE_LOCAL_AUTH = false in this file
- * 8. Wire up the real SDK calls in utils/authService.js
- *
- * Firebase API keys in mobile/web apps are public identifiers — they are NOT secret
- * on their own. Still use `.env` so keys are not committed to git by accident.
- * Protect your project with Firebase Auth rules and App Check before launch.
+ * Setup:
+ * 1. Create a Firebase project
+ * 2. Add EXPO_PUBLIC_FIREBASE_* values to root `.env`
+ * 3. npm install firebase
+ * 4. Set CLOUD_AUTH_ENABLED = true in config/cloudFlags.js (dev only at first)
+ * 5. Keep CLOUD_MIGRATION_ENABLED false until migration is reviewed
  */
+
+import { CLOUD_AUTH_ENABLED } from './cloudFlags';
 
 /**
- * While true, Ghost Mode uses fake local login saved in AsyncStorage.
- * Keep this true until Firebase Auth is fully connected and tested.
+ * Legacy local-only switch. Prefer CLOUD_AUTH_ENABLED + isFirebaseConfigured().
+ * When true, forces local AsyncStorage auth regardless of Firebase env.
  */
-export const USE_LOCAL_AUTH = true;
+export const USE_LOCAL_AUTH = !CLOUD_AUTH_ENABLED;
 
-/** Firebase project settings — empty until you add `.env` values above. */
+/** Firebase project settings — empty until you add `.env` values. */
 export const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
@@ -41,10 +31,7 @@ export const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
 };
 
-/** Returns true when Firebase config is filled in and local auth is turned off. */
-export function isFirebaseConfigured() {
-  if (USE_LOCAL_AUTH) return false;
-
+export function hasFirebaseEnvConfig() {
   return Boolean(
     firebaseConfig.apiKey &&
       firebaseConfig.authDomain &&
@@ -53,7 +40,12 @@ export function isFirebaseConfigured() {
   );
 }
 
-/** Which auth backend the app is using right now. */
+/** Ready for live Firebase Auth calls (flag + env). */
+export function isFirebaseConfigured() {
+  return CLOUD_AUTH_ENABLED && hasFirebaseEnvConfig();
+}
+
+/** Which auth backend the app should use. */
 export function getAuthMode() {
   return isFirebaseConfigured() ? 'firebase' : 'local';
 }

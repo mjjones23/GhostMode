@@ -621,6 +621,60 @@ export default function StreakTrackerScreen() {
           </View>
         </Pressable>
 
+        <Pressable
+          style={({ pressed }) => [
+            styles.insightsCard,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={() => navigateToScreen('MusicHub')}
+        >
+          <View style={styles.insightsCardTop}>
+            <View style={styles.insightsIconWrap}>
+              <Ionicons name="musical-notes" size={22} color="#c4b5fd" />
+            </View>
+            <View style={styles.insightsCardContent}>
+              <View style={styles.insightsTitleRow}>
+                <Text style={styles.insightsCardTitle}>Music Hub</Text>
+              </View>
+              <Text style={styles.insightsCardSubtitle}>
+                Relaxation, Sleep, Rain, Ocean, Motivation, Focus
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color="rgba(255,255,255,0.35)"
+            />
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.insightsCard,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={() => navigateToScreen('VoiceCoach')}
+        >
+          <View style={styles.insightsCardTop}>
+            <View style={styles.insightsIconWrap}>
+              <Ionicons name="mic" size={22} color="#c4b5fd" />
+            </View>
+            <View style={styles.insightsCardContent}>
+              <View style={styles.insightsTitleRow}>
+                <Text style={styles.insightsCardTitle}>Voice AI Coach</Text>
+              </View>
+              <Text style={styles.insightsCardSubtitle}>
+                Speak instead of texting them
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color="rgba(255,255,255,0.35)"
+            />
+          </View>
+        </Pressable>
+
         <Text style={styles.sectionTitle}>Quick actions</Text>
 
         {emergency && (

@@ -25,9 +25,10 @@ export function buildQuotaLimitCopy(quota) {
   };
 }
 
-export function clientShouldEnforceQuota(isPro) {
+export function clientShouldEnforceQuota(_isPro) {
+  // Free and Pro both use server windows when flags are on; limits differ by tier.
   if (!AI_QUOTA_ENABLED || !PREMIUM_ENABLED) return false;
-  return !isPro;
+  return true;
 }
 
 export function parseQuotaExceededResponse(data, status) {

@@ -18,7 +18,9 @@
     "test:quota": "node backend/test-quota.js",
     "test:weekly-report": "node scripts/test-weekly-report.js",
     "test:batch1": "node backend/test-quota.js && node scripts/test-weekly-report.js && node scripts/test-batch1-memory-quota.js",
-    "test": "npm run check:imports && npm run test:coach-context && npm run test:coach-memory && npm run test:password-migration && npm run test:batch1",
+    "test:batch2": "node scripts/test-batch2-cloud-music.js",
+    "generate:ambient": "node scripts/generate-original-ambient.js",
+    "test": "npm run check:imports && npm run test:coach-context && npm run test:coach-memory && npm run test:password-migration && npm run test:batch1 && npm run test:batch2",
     "build:ios": "eas build --platform ios --profile production --auto-submit",
     "build:ios:only": "eas build --platform ios --profile production",
     "submit:ios": "eas submit --platform ios --profile production --latest"
@@ -32,6 +34,7 @@
     "@react-navigation/native-stack": "^7.20.0",
     "babel-preset-expo": "~58.0.0",
     "expo": "^58.0.0",
+    "expo-audio": "~58.0.12",
     "expo-constants": "~58.0.15",
     "expo-crypto": "~58.0.7",
     "expo-device": "~58.0.5",

@@ -219,6 +219,36 @@ export async function restorePurchases() {
  * Checks whether the user has an active RevenueCat premium entitlement.
  * Does not include the Settings premium access toggle — PremiumContext merges both sources.
  */
+/**
+ * Asks the Ghost Mode backend for a server-verified entitlement.
+ * Used once live purchases + webhooks are connected. Safe no-op without API URL.
+ */
+export async function verifyServerEntitlement(accountId) {
+  try {
+    const { getCoachApiUrl, isCoachApiConfigured } = require('../config/api');
+    if (!isCoachApiConfigured() || !accountId) {
+      return { ok: false, active: false, reason: 'unavailable' };
+    }
+    const baseUrl = getCoachApiUrl();
+    const response = await fetch(
+      `${baseUrl}/entitlements?accountId=${encodeURIComponent(accountId)}`
+    );
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { ok: false, active: false, reason: data.error || 'request_failed' };
+    }
+    return {
+      ok: true,
+      active: Boolean(data.active),
+      productId: data.productId || null,
+      source: data.source || 'server',
+      quotas: data.quotas || null,
+    };
+  } catch {
+    return { ok: false, active: false, reason: 'network_error' };
+  }
+}
+
 export async function checkPremiumStatus() {
   await configurePurchases();
 
@@ -228,6 +258,8 @@ export async function checkPremiumStatus() {
       source: 'none',
       entitlementId: REVENUECAT_ENTITLEMENT_ID,
       productIds: PRODUCT_IDS,
+      livePurchases: false,
+      restoreSupported: false,
     };
   }
 

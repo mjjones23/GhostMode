@@ -139,17 +139,24 @@ async function getQuotaStatus(accountId) {
  * Atomically consume one free message if under the limit.
  * Returns { allowed: false, ...status } without incrementing when blocked.
  */
-async function tryConsumeQuota(accountId) {
+async function tryConsumeQuota(accountId, { limit = FREE_LIMIT, windowMs = WINDOW_MS } = {}) {
   const id = normalizeAccountId(accountId);
   if (!id) {
     return { ok: false, error: 'accountId is required', allowed: false };
   }
 
+  const effectiveLimit = Number.isFinite(limit) && limit > 0 ? limit : FREE_LIMIT;
+  const effectiveWindow = Number.isFinite(windowMs) && windowMs > 0 ? windowMs : WINDOW_MS;
+
   return withAccountLock(id, async () => {
     const now = Date.now();
     const store = readStoreSync();
-    const timestamps = pruneTimestamps(store.accounts[id]?.timestamps, now);
-    const status = buildStatus(timestamps, now);
+    const timestamps = pruneTimestamps(
+      store.accounts[id]?.timestamps,
+      now,
+      effectiveWindow
+    );
+    const status = buildStatus(timestamps, now, effectiveLimit, effectiveWindow);
 
     if (!status.allowed) {
       return { ok: true, accountId: id, consumed: false, ...status };
@@ -162,7 +169,7 @@ async function tryConsumeQuota(accountId) {
     };
     writeStoreSync(store);
 
-    const after = buildStatus(next, now);
+    const after = buildStatus(next, now, effectiveLimit, effectiveWindow);
     return {
       ok: true,
       accountId: id,

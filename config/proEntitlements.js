@@ -1,5 +1,5 @@
 /**
- * Ghost Mode Free vs Pro entitlement map (Batch 1 foundation).
+ * Ghost Mode Free vs Pro entitlement map (Batch 2).
  * Live App Store purchases are not connected yet — see revenuecat.js.
  */
 
@@ -34,6 +34,16 @@ export const FREE_AI_QUOTA = {
 };
 
 /**
+ * Pro AI allowance (server-configurable later via env).
+ * Higher than free; not unlimited by default for cost control.
+ */
+export const PRO_AI_QUOTA = {
+  limit: 200,
+  windowMs: 5 * 60 * 60 * 1000,
+  windowLabel: '5 hours',
+};
+
+/**
  * Entitlement keys used by gates and paywall copy.
  * Essential non-AI support stays free even when Pro gating is on.
  */
@@ -46,12 +56,13 @@ export const ENTITLEMENTS = {
   DAILY_RECOVERY_PLAN: { free: true, pro: true },
   WEEKLY_PROGRESS_REPORT: { free: true, pro: true },
   CRISIS_SOS: { free: true, pro: true },
-  AI_COACH: { free: true, pro: true }, // free tier may still hit message quota
+  AI_COACH: { free: true, pro: true },
   AI_COACH_UNLIMITED: { free: false, pro: true },
   AI_MEMORY: { free: true, pro: true },
   PROGRESS_INSIGHTS: { free: false, pro: true },
   DAILY_REMINDERS: { free: false, pro: true },
-  MUSIC_PLAYER: { free: false, pro: true },
+  MUSIC_PLAYER: { free: true, pro: true }, // free tracks available; some require Pro
+  MUSIC_PRO_TRACKS: { free: false, pro: true },
   VOICE_COACH: { free: false, pro: true },
 };
 
@@ -65,5 +76,9 @@ export function hasEntitlement(entitlementKey, isPro) {
 export function shouldEnforceAiQuota(isPro) {
   if (!AI_QUOTA_ENABLED) return false;
   if (!PREMIUM_ENABLED) return false;
-  return !isPro;
+  return true; // both free and pro may have windows; limits differ server-side
+}
+
+export function getAiQuotaForTier(isPro) {
+  return isPro ? PRO_AI_QUOTA : FREE_AI_QUOTA;
 }

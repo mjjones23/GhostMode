@@ -26,11 +26,11 @@ import {
 import ScreenBackButton from '../components/ScreenBackButton';
 
 const FEATURES = [
-  'Unlimited AI Coach messages (no free quota)',
+  'Higher AI Coach limits (200 msgs / 5 hours)',
   'Progress insights & weekly reports',
   'Unlimited journal & mood history',
   'Daily healing reminders',
-  'Priority access to Pro music & voice (coming soon)',
+  'Pro Music Hub tracks + Voice AI Coach',
 ];
 
 export default function PaywallScreen() {

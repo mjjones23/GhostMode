@@ -26,6 +26,8 @@ import SignUpScreen from '../screens/SignUpScreen';
 import CrisisLockScreen from '../screens/CrisisLockScreen';
 import SOSModeScreen from '../screens/SOSModeScreen';
 import DailyCheckInScreen from '../screens/DailyCheckInScreen';
+import MusicHubScreen from '../screens/MusicHubScreen';
+import VoiceCoachScreen from '../screens/VoiceCoachScreen';
 
 import { getAppEntryRoute } from '../utils/storage';
 import { usePremium } from '../context/PremiumContext';
@@ -194,6 +196,8 @@ export default function RootNavigator() {
           }}
         />
         <Stack.Screen name="Paywall" component={PaywallScreen} options={modalScreenOptions} />
+        <Stack.Screen name="MusicHub" component={MusicHubScreen} />
+        <Stack.Screen name="VoiceCoach" component={VoiceCoachScreen} />
         <Stack.Screen name="DailyReminder" component={DailyReminderScreen} options={modalScreenOptions} />
         <Stack.Screen
           name="SafetyDisclaimer"

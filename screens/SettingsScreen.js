@@ -371,6 +371,27 @@ export default function SettingsScreen() {
           <SettingsRow label="Name" value={user?.name || '—'} showChevron={false} />
           <View style={styles.divider} />
           <SettingsRow label="Email" value={user?.email || '—'} showChevron={false} />
+          <View style={styles.divider} />
+          <SettingsRow
+            label="Cloud auth"
+            value="Local (cloud inactive)"
+            showChevron={false}
+          />
+        </View>
+
+        <Text style={styles.sectionTitle}>Wellness</Text>
+        <View style={styles.card}>
+          <SettingsRow
+            label="Music Hub"
+            value="Ambient sounds"
+            onPress={() => navigateToAppScreen(navigation, 'MusicHub')}
+          />
+          <View style={styles.divider} />
+          <SettingsRow
+            label="Voice AI Coach"
+            value="Talk instead of text"
+            onPress={() => navigateToAppScreen(navigation, 'VoiceCoach')}
+          />
         </View>
 
         <Text style={styles.sectionTitle}>No contact</Text>

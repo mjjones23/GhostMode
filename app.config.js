@@ -51,6 +51,15 @@ export default {
           sounds: [],
         },
       ],
+      [
+        'expo-audio',
+        {
+          microphonePermission:
+            'Ghost Mode uses the microphone for optional Voice AI Coach messages. Recordings are processed only when you choose to send them.',
+          recordAudioAndroid: true,
+          enableBackgroundPlayback: false,
+        },
+      ],
       // LATER (RevenueCat + App Store subscriptions):
       // 1. npm install react-native-purchases
       // 2. Add EXPO_PUBLIC_REVENUECAT_IOS_API_KEY to .env (see config/revenuecat.js)

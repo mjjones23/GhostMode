@@ -4,15 +4,20 @@ import {
   logoutLocalUser,
   registerLocalUser,
 } from './storage';
+import { getAuthMode, isFirebaseConfigured } from '../config/firebaseConfig';
+import {
+  cloudGetCurrentUser,
+  cloudLogin,
+  cloudLogout,
+  cloudSignUp,
+  getCloudAuthStatus,
+} from '../services/cloudAuthService';
 
 /**
- * Ghost Mode auth service.
- *
- * Uses fake local login (AsyncStorage) for now.
- * Firebase will be added later — see config/firebaseConfig.js.
+ * Ghost Mode auth service (Batch 2).
+ * Defaults to local AsyncStorage accounts.
+ * Cloud (Firebase) activates only when CLOUD_AUTH_ENABLED + env config are set.
  */
-
-const USE_LOCAL_AUTH = true;
 
 function mapLocalUser(user) {
   if (!user) return null;
@@ -24,13 +29,12 @@ function mapLocalUser(user) {
   };
 }
 
-/** Create a new account (local demo auth). */
+/** Create a new account. */
 export async function signUpUser({ name, email, password }) {
-  if (!USE_LOCAL_AUTH) {
-    return {
-      ok: false,
-      message: 'Sign-in is temporarily unavailable. Please try again later.',
-    };
+  if (isFirebaseConfigured()) {
+    const cloud = await cloudSignUp({ name, email, password });
+    if (cloud.ok) return cloud;
+    // Fall back to local so development never bricks signup.
   }
 
   const result = await registerLocalUser({ name, email, password });
@@ -43,13 +47,11 @@ export async function signUpUser({ name, email, password }) {
   };
 }
 
-/** Sign in with email and password (local demo auth). */
+/** Sign in with email and password. */
 export async function loginUser({ email, password }) {
-  if (!USE_LOCAL_AUTH) {
-    return {
-      ok: false,
-      message: 'Sign-in is temporarily unavailable. Please try again later.',
-    };
+  if (isFirebaseConfigured()) {
+    const cloud = await cloudLogin({ email, password });
+    if (cloud.ok) return cloud;
   }
 
   const result = await loginLocalUser({ email, password });
@@ -64,12 +66,27 @@ export async function loginUser({ email, password }) {
 
 /** Sign the current user out. */
 export async function logoutUser() {
+  if (isFirebaseConfigured()) {
+    await cloudLogout();
+  }
   await logoutLocalUser();
-  return { ok: true, mode: 'local' };
+  return { ok: true, mode: getAuthMode() };
 }
 
 /** Return the signed-in user, or null if logged out. */
 export async function getCurrentUser() {
+  if (isFirebaseConfigured()) {
+    const cloudUser = await cloudGetCurrentUser();
+    if (cloudUser) return cloudUser;
+  }
+
   const user = await loadLoggedInUser();
   return mapLocalUser(user);
+}
+
+export function getAuthStatus() {
+  return {
+    mode: getAuthMode(),
+    cloud: getCloudAuthStatus(),
+  };
 }
